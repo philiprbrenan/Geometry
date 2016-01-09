@@ -1,12 +1,12 @@
 //------------------------------------------------------------------------------
-// 𝕯raw draggable, mirrored, rotatable, translatable animated geometric shapes
+// 𝕯raw draggable, reflectable, rotatable, translatable animated geometric shapes
 // in two dimensions on Android via Canvas.drawVertices()
 // 𝗣𝗵𝗶𝗹𝗶𝗽 𝗥 𝗕𝗿𝗲𝗻𝗮𝗻  at gmail dot com, Appa Apps Ltd Inc 2015/08/14 17:12:39
-// I, the author of this work, hereby place this work in the public domain.
+// 𝗜, the author of this work, hereby place this work in the public domain.
 // 𝗻𝗯: Rotations are measured in degrees, clockwise, from the x axis.
 //------------------------------------------------------------------------------
-// 𝝰 𝝱 𝝲 𝝳 𝝷 𝝫 𝞅 𝝮 𝞈 say                                                        // Index
-// 𝕽otated radius makes a circle - diameter rotated draws the same circle - need the radius version as well as first step up
+// 𝝰 𝝱 𝝲 𝝳 𝝷 𝝺 𝝻 𝝫 𝞅 𝝮 𝞈 say                                                    // Index
+// Rotated radius makes a circle - diameter rotated draws the same circle - need the radius version as well as first step up
 // Opposite angles are equal via two way reflection of a radius
 // A diameter is the longest line in a circle
 // Rotating a right angle triangle makes a rectangle, hence the formula for the area of a triangle
@@ -14,17 +14,26 @@
 // Rotate a mirror placed on the corner of a rectangle show that the reflection does not merge with the original, conversely a square does as do both if the mirror is through the centre. Construct a square by rotating a reflected rectangle onto itself.
 // Rotate parallel lines crossed with a diagonal onto themselves. Likewise a single line
 // Flash selection along a sine wave so that the selection flashing is less abrupt
-// Resolve lack of name means no selection possible and everything flashing - everything that is selectable should flash slowly when nothing has been pressed fpr 10 or so seconds
+// Resolve lack of name means no selection possible and everything flashing - everything that is selectable should flash slowly when nothing has been pressed for 10 or so seconds
 // The quadrants of a rectangle have equal areas
 // A kite, diamond, square has half the area of the enclosing square/rectangle
 // Move items around line 170 into Drawing
 // Remove x = cx etc. as they are now the defaults
-// Similar triangles by drawing similar triangles inside a triangle or focussed through a point
-// Replace OPT: with suggested optimizations in java.util.Arrays and System.arraycopy
-// Add do not trace capability so that tabs do not get traced
-// Sierpinski's triangle in the 3/exterior version and 1/interior version with the shape of the external triangle changeable by dragging
 // Two reflection (via two mirrors) equals a rotation of twice the angle between the mirrors angle
-// Use Pythagoras to produce a square with the same area as a rectangle
+// Given a triangle(A,B,C), choose any point P, then draw a circle or a in-circle  through the centre of the in-circles of PAB, PBC, PAC: does this circle have the same centre as the centre of the circle through ABC?
+// Given a triangle(A,B,C), draw a circle with centre 𝗖 through its vertices, then draw another circle 𝗗 with the same centre as 𝗖 and draw lines from each vertex through 𝗖 to 𝗗 to show that a similar triangle is formed where these lines cross 𝗗
+// Are the in-circles of the quadrants of a rectangle the same size?  Do they reflect in the diagonals?
+// Coordinated zoom - overlayable lines
+// Trilinear coordinates of a point moved around a triangle by the user per haps not expressed as numbers but as a bar chart - ditto barycentric
+// Tangential polygons: any triangle, any regular polygon, but also diamonds and  not rectangles
+// https://en.wikipedia.org/wiki/Incircle_and_excircles_of_a_triangle#Gergonne_triangle_and_point
+// https://en.wikipedia.org/wiki/Nagel_point
+// https://en.wikipedia.org/wiki/Medial_triangle
+// https://en.wikipedia.org/wiki/Morley's_trisector_theorem
+// The colors that the user is not touching could become more translucent so that the touched overlay line can be seen more clearly
+// CurrentGoal is unstaisfactory because setGoal() is action rather than description
+// The altitude of a right angle triangle divides the triangle into two similar triangles
+// Triangle of altitudes from altitudes and centroids from centroids
 package com.appaapps.generic;
 
 import android.graphics.*;
@@ -40,6 +49,7 @@ public class Activity extends android.app.Activity                              
 //  TestDrawing
 //  DrawRectangle
 //  DrawTriangle
+//  DrawCircle
 //  DrawTab
 //  DrawPolyArea
 //  SnowFlake
@@ -60,19 +70,23 @@ public class Activity extends android.app.Activity                              
 //  ParallelLinesPreserveAngles
 //  InteriorAnglesOfATriangleMakeALine
 //  DraggableTriangle
+//  Sierpinski
 //  Pythagoras
+//  SquaringARectangle
+//  ComparingLengths
 //  SchwartzInequality
 //  CongruentIsocelesTriangles
 //  CongruentScaleneTriangles
-//  Circle3Points
-    QuarterTriangles
+    EulerLine
+//  InCircleCentres
+//  QuarterTriangles
      (this));
    }
 //------------------------------------------------------------------------------
 // 𝕮reate drawing surface and draw vertices upon it
 //------------------------------------------------------------------------------
   abstract class DisplayDrawing extends SurfaceView implements SurfaceHolder.Callback, View.OnTouchListener
-   {final int 𝝺r = Colours.Red, 𝝺b = Colours.Blue, 𝝺g   = Colours.Green,        // Useful colours
+   {final int 𝝺r = Colours.Red, 𝝺b = Colours.Blue, 𝝺g = Colours.Green,          // Useful colours
       𝝺c   = Colours.Cyan,            𝝺m   = Colours.Magenta,
       𝝺o   = Colours.BurntOrange,     𝝺y   = Colours.Yellow,
       𝝺fbe = Colours.FrenchBeige,     𝝺fbi = Colours.FrenchBistre,              // French colour scheme
@@ -92,18 +106,22 @@ public class Activity extends android.app.Activity                              
       𝝺w   = Colours.White,            𝝺ws = Colours.WhiteSmoke;
     final float
       flipTime = 10f, bumpSpeed = 40f,                                          // Time in one state before we flip to the next state, speed bump to jump to new state
-      closeEnoughAngle = 8,                                                     // Angle close enough in degrees
+      closeEnoughAngle = 5,                                                     // Angle close enough in degrees
       sdCloseEnoughAngle = sd(closeEnoughAngle);                                // Sine of angle close
     final int mirrorsNone=0, mirror1=1, mirror2=2, mirrorsBoth=3;               // Mirror selection
-    final 𝝮 𝞈1 = new 𝝮("Tracker1"), 𝞈2 = new 𝝮("Tracker2"),                     // Drag trackers
-            𝞈3 = new 𝝮("Tracker3"), 𝞈Rotation = new 𝝮("TracingRotation"),       // Tracing rotation tracker
+    final 𝝮
+      𝞈1 = new 𝝮("Tracker1"), 𝞈2 = new 𝝮("Tracker2"),                           // Drag trackers
+      𝞈3 = new 𝝮("Tracker3"), 𝞈4 = new 𝝮("Tracker4"),
+      𝞈Rotation    = new 𝝮("TracingRotation"),                                  // Tracing rotation tracker
       𝞈Translation = new 𝝮("TracingTranslation");                               // Tracing translation tracker
+    final Matrix tracingMatrix = new Matrix();                                  // Tracing matrix
     final long startTime = t();                                                 // Start time of animation
     final int period = 10000;                                                   // Default rotation period in ms
     final int loopTime = (debug & debugSlow) > 0 ? 400 : 1;                     // Minimum time between draws
     final Paint paint = new Paint();                                            // Paint for vertices
     final float flashCycle = 1;                                                 // Flash of selected item cycle time
-    double pressedTime;                                                         // Time of last press
+    int touchedColour;                                                          // The colour the user is touching if the ColourAtTouch capability is in use
+    double pressedTime, releasedTime;                                           // Time of last press, release
     Canvas canvas;                                                              // Canvas the drawing will be drawn on
     Drawing drawing;                                                            // The current drawing being displayed
     Drawing.SelectedItem selectedItem;                                          // The selected item on the current drawing
@@ -146,26 +164,33 @@ public class Activity extends android.app.Activity                              
       switch(m.getActionMasked())                                               // 𝞅𝝸𝝺
        {case MotionEvent.ACTION_DOWN:                                           // Primary down
           pointerId = m.getPointerId(m.getActionIndex());                       // Save pointer id of primary pointer
-          pressed = true;
-          pressedTime = T();
+          pressed = true;                                                       // Pressed
+          pressedTime = T();                                                    // Time of last press
           findTopMostSelectedItem(x, y);                                        // Select the top most touched item
           touchedTopMostItemPosition(x, y);                                     // Update effects of touch on drawing items
+//        colourAtTouch(x, y);                                                  // Get colour at touch is possible
           if (!rotationControllerSelected())    𝞈Rotation   .reset();           // Remove tracing if selected item is not a tracing controller
           if (!translationControllerSelected()) 𝞈Translation.reset();           // Remove translation if selected item is not a translation controller
+          if (currentGoal != null) currentGoal.reset();                         // Reset current goal
           pointerPressed();                                                     // Forward
         return true;
         case MotionEvent.ACTION_POINTER_DOWN:                                   // Secondary down and dragging an item on the translation tracker
         return true;
         case MotionEvent.ACTION_UP:                                             // Up
         case MotionEvent.ACTION_CANCEL:
-          pressed = false;
+          pressed = false;                                                      // Not pressed
+          releasedTime = T();                                                   // Time of last release
           draggedTopMostItemPosition(x, y);                                     // Update effects of drag on drawing items
           pointerReleased();                                                    // Pointer release is processed before we reset the selected item - this allows improvement processing to occur on the tracing as well as the original
+//        colourAtTouchReset();                                                 // Reset touch colour meaning that as soon as the user lifts their finger the colour is unselected
+          if (drawing != null && currentGoal!=null) currentGoal.check();        // Check whether we have reached the current goal or not - presumably we need a drawing to be able to do this.
           selectedItem = null;                                                  // Must be last to allow pointerReleased() to process the selectedItem
         return true;
         case MotionEvent.ACTION_MOVE:                                           // Drag
           draggedTopMostItemPosition(x, y);                                     // Process primary pointer move on selected item
+//        colourAtTouch(x, y);                                                  // Get colour at touch is possible
           pointerDragged();
+          if (drawing!=null&&currentGoal!=null) currentGoal.indicateHowClose(); // Indicate how far we are form the current goal by the music level
         return true;
         default:
           pressed = false;
@@ -176,8 +201,6 @@ public class Activity extends android.app.Activity                              
     void pointerPressed () {if (drawing != null) drawing.pointerPressed ();}    // Pointer pressed
     void pointerDragged () {if (drawing != null) drawing.pointerDragged ();}    // Pointer dragged
     void pointerReleased() {if (drawing != null) drawing.pointerReleased();}    // Pointer released
-
-    void volumeLevel(final float v) {}                                          // Set  volume level
 
     void findTopMostSelectedItem(final float x, final float y)                  // Find the top most selected item if an item has been selected
      {selectedItem = drawing == null ? null : drawing.findTopMostSelectedItem(x, y);
@@ -195,6 +218,20 @@ public class Activity extends android.app.Activity                              
      {return selectedItem != null && selectedItem.item.values.𝞈==𝞈Translation;
      }
     float mirrorSeperation() {return nd(𝞈1.angle-𝞈2.angle);}                    // Separation angle between mirrors
+//------------------------------------------------------------------------------
+// 𝕮olour at touch capability
+//------------------------------------------------------------------------------
+//  boolean colourAtTouchTimedOut()                                             // Use colour at touch processing to reorder the drawing order if pressed or within timeout.
+//   {return !pressed && Since(releasedTime) > 5;
+//   }
+//  int ColourAtTouchWanted() {return 0;}                                       // Override with number of elements to save if this facility is required
+//  int colourAtTouch = 0;                                                      // Current touch colour
+//  void colourAtTouchReset() {colourAtTouch = 0;}
+//  void colourAtTouch(final float x, final float y)                            // Get colour at touch is possible
+//   {final int c = drawing != null && drawing.ColourAtTouch != null ?          // Get colour or reset
+//      drawing.ColourAtTouch.touchedColour(x, y) : 0;
+//    if (c != 0) colourAtTouch = c;                                            // Update colour if a new colour has been found
+//   }
 //------------------------------------------------------------------------------
 // 𝕯raw and time the display rate
 //------------------------------------------------------------------------------
@@ -217,13 +254,15 @@ public class Activity extends android.app.Activity                              
        vsh.unlockCanvasAndPost(canvas);                                          // Display canvas
      }
     abstract Drawing loadDrawing();                                             // Load the drawing from a user supplied override
-    void achieved(Object c, String a)                                           // Achievement - override to receive any achievements that the user achieves
-     {//say("Achieved "+a+" in class "+c.getClass().getEnclosingClass().getSimpleName());
-      say("Achieved "+a+" in class "+c.getClass().getSimpleName());
-     }
-// Move the following into Drawing
     void underlay() {if (drawing != null) drawing.underlay();}                  // Highlights drawn under the drawing
     void overlay()  {if (drawing != null) drawing.overlay();}                   // Highlights drawn over the drawing
+//------------------------------------------------------------------------------
+// 𝕻aint details and applications as used in overlays to elucidate the drawing
+//------------------------------------------------------------------------------
+    Stack<Mirror> overlayMirror;                                                // If present will produce a single reflection in each mirror of the items drawn below which differs from the behavior of items where reflections in one of the mirrors are reflected again in the other mirror if present. Reflected items are drawn at lower opacity.
+    Integer opacityOverride;                                                    // Controls opacity if set
+    DashPathEffect dashOverride;                                                // Controls dashing if set
+
     float innerThickness()                                                      // Half the thickness of central lines in the upper layer of this drawing
      {final float t = canvas == null ?  16f : m(64, M(8, sq(m(w, h))));         // Size to canvas
       return t / 8f;                                                            // Scaled
@@ -232,22 +271,126 @@ public class Activity extends android.app.Activity                              
     void setPaint() {setPaint(𝝺w);}                                             // Set paint to known state for drawing overlays with default colour
     void setPaint(final int colour)                                             // Set paint to known state for drawing overlays with supplied colour
      {paint.setColor(colour);                                                   // Set colour
-//    paint.setAlpha(defaultOpacity1()); if setPaint() is only used for overlays, then I think full opacity is required // Full opacity
-      paint.setAlpha(255);                                                      // Full opacity
+      paint.setPathEffect(null);                                                // No line dashes
+      paint.setAlpha(opacityOverride == null ? 255 : opacityOverride);          // Full opacity
+      paint.setPathEffect(dashOverride);                                        // Dash effect
       paint.setStyle(Paint.Style.FILL_AND_STROKE);                              // Fill and Stroke
       paint.setStrokeWidth(innerThickness()*2);                                 // Standard thickness
      }
-    void setPaint(final int colour, float strokeWidth)                          // Set paint to known state for drawing overlays with supplied colour
+    void setPaint(final int colour, final float strokeWidth)                    // Set paint to known state for drawing overlays with supplied colour
      {setPaint(colour);                                                         // Set general characteristics
       paint.setStyle(Paint.Style.STROKE);                                       // Fill and Stroke
       paint.setStrokeWidth(strokeWidth);                                        // Fill and Stroke
      }
+    void setPaint(final int colour, final DashPathEffect dpe)                   // Set paint to known state for drawing overlays with supplied colour and dash effect
+     {setPaint(colour);                                                         // Set general characteristics
+      paint.setPathEffect(dpe);                                                 // Dash effect
+     }
+    void setPaint(final int colour, final float strokeWidth,                    // Set paint to known state for drawing overlays with supplied colour and dash effect
+                  final DashPathEffect dpe)
+     {setPaint(colour);                                                         // Set general characteristics
+      paint.setStyle(Paint.Style.STROKE);                                       // Fill and Stroke
+      paint.setStrokeWidth(strokeWidth);                                        // Fill and Stroke
+      paint.setPathEffect(dpe);                                                 // Dash effect
+     }
     int defaultOpacity0() {return 255* 8/16;}                                   // Default opacity for lower layer
     int defaultOpacity1() {return 255*10/16;}                                   // Default opacity for upper layer
+
+    void drawLine(final RectF r) {drawLine(r.left, r.top, r.right, r.bottom);}  // These draw routines save their colours so we can question what colour the user is touching
+    void drawLine(final PointF p, PointF 𝗽) {drawLine(p.x, p.y, 𝗽.x, 𝗽.y);}     // Draw a line from a point(p) to point(𝗽)
+    void drawLine(final PointF p, final float x, final float y)                 // Draw a line from a point(p) to point(x,y)
+     {drawLine(p.x, p.y, x, y);
+     }
+    void drawLine(final float x, final float y, final float 𝘅, final float 𝘆)   // Draw line and save colour
+     {canvas.drawLine(x, y, 𝘅, 𝘆, paint);
+      if (overlayMirror != null)                                                // Draw refelections if there any mirrors present
+       {final int alpha = paint.getAlpha();                                     // Save paint alpha
+        for(final Mirror m : overlayMirror)                                     // Each mirror
+         {m.reflectInMirror(x, y);                                              // Reflect one end of the line segment
+          final float X = m.𝖃, Y = m.𝖄;
+          m.reflectInMirror(𝘅, 𝘆);                                              // Reflect other end
+          final float 𝗫 = m.𝖃, 𝗬 = m.𝖄;
+          paint.setAlpha(alpha/2);                                              // Lower alpha for reflection
+          canvas.drawLine(X, Y, 𝗫, 𝗬, paint);                                   // Draw reflection
+         }
+        paint.setAlpha(alpha);                                                  // Restore paint alpha
+       }
+     }
+    void drawAlternatingLine(int c, int 𝗰,                                      // Draw a line that alternates between colour(c) and colouy(𝗰)
+      final DashPathEffect 𝕕1, final DashPathEffect 𝕕2,                         // using these dash paths for each colout
+      final float x, final float y, final float 𝘅, final float 𝘆)               //between point(x,y) and point(𝘅,𝘆)
+     {setPaint(c, 𝕕1); drawLine(x, y, 𝘅, 𝘆);
+      setPaint(𝗰, 𝕕2); drawLine(x, y, 𝘅, 𝘆);
+     }
+
+    void drawLines(final float[]lines)                                          // Draw a set of lines and save colour
+     {final int 𝗻 = lines.length;
+      final float[]𝗹 = lines;
+      for(int i = 0; i < 𝗻; i += 4)
+       {final int 𝗶 = i;
+        drawLine(𝗹[𝗶+0], 𝗹[𝗶+1], 𝗹[𝗶+2], 𝗹[𝗶+3]);
+       }
+     }
+    void drawCircle(final float x, final float y, final float 𝗿)                // Draw circle and save colour
+     {canvas.drawCircle(x, y, 𝗿, paint);
+      if (overlayMirror != null)                                                // Draw refelections if there any mirrors present
+       {final int alpha = paint.getAlpha();                                     // Save paint alpha
+        for(final Mirror m : overlayMirror)                                     // Each mirror
+         {m.reflectInMirror(x, y);                                              // Reflect centre of circle
+          final float X = m.𝖃, Y = m.𝖄;
+          canvas.drawCircle(X, Y, 𝗿, paint);                                    // Draw reflection
+         }
+        paint.setAlpha(alpha);                                                  // Restore paint alpha
+       }
+     }
+    void drawMirrors(final int 𝝺1, final int 𝝺2,
+      final DashPathEffect 𝕕1, final DashPathEffect 𝕕2)                         // Draw mirrors in alternating colours
+     {if (overlayMirror == null) return;                                        // Draw refelections if there any mirrors present
+      for(final Mirror m : overlayMirror)                                       // Each mirror
+       {final float dx = m.𝕏, dy = m.𝕐, d = d(dx, dy), 𝗱 = d(w,h)/d,            // Mirror vector
+          mx = 𝗱 * dx,  my = 𝗱 * dy,                                            // Vector parallel to mirror long enough to cross the entire screen
+           x = m.x+mx,   y = m.y+my, 𝘅 = m.x-mx, 𝘆 = m.y-my;                    // Start and end points of mirror long enough to cross the screen in any orientation
+        setPaint(𝝺1, 𝕕1); canvas.drawLine(x, y, 𝘅, 𝘆, paint);                   // Draw mirror lines directly so they are not reflected
+        setPaint(𝝺2, 𝕕2); canvas.drawLine(x, y, 𝘅, 𝘆, paint);
+       }
+     }
+//------------------------------------------------------------------------------
+// 𝕲oals - things we are trying to get the user to do - 1:1 with DisplayDrawing
+//------------------------------------------------------------------------------
+    final Stack<Goal> Goals = new Stack<Goal>();                                // All known goals
+    Goal currentGoal = null;                                                    // The goal we are prompting the user to achieve
+    void setCurrentGoal(final Goal goal) {currentGoal = goal;}                  // Set the current goal for the user to acheive
+    void achieved(Goal g)                                                       // Achievement - override to receive any achievements that the user achieves
+     {if (g == null) return;                                                    // Own goal
+      say("Achieved "+(g == currentGoal ? "current" : "different")+" goal: "+g.name);
+     }
+    void volumeLevel(final float v) {}                                          // Set  volume level - override to process volume level
+
+    abstract class Goal
+     {final String name;
+      boolean achieved;                                                         // Whether the goal was achieved at the last lift or not - reset in touch
+      Goal(String Name) {name = Name; Goals.add(0, this);}                      // Add in reverse order so that searches find the most specific goal first
+      void check()                                                              // Check that this goal has been achieved
+       {if (achieved = checkAchieved())
+         {improveUserEffort();
+          achieved(this);
+         }
+        else for(Goal g: Goals) if (g.checkAchieved()) {achieved(g); break;}    // See if it could be any other goal
+       }
+      void indicateHowClose()                                                   // Indicate how close we are to the goal
+       {final float c = a(howClose());
+        volumeLevel(c > 1 ? 1-1/c : 1-c);                                       // Show closeness via volume level of music 0 to 1
+       }
+      void reset() {achieved = false;}                                          // Reset achieved state
+      boolean achievedGoal() {return achieved;}                                 // Whether the goal has been achieved
+      abstract boolean checkAchieved ();                                        // Override this to perform the specific checks for your subclassed goal
+      abstract void    improveUserEffort();                                     // Override this to improve the user's solution
+      abstract float   howClose();                                              // Override this to indicate how close 0 or >> 1 - far, 1 - close the current solution is
+     } // Goal
 //------------------------------------------------------------------------------
 // 𝕸irror
 //------------------------------------------------------------------------------
-    class 𝝫                                                                     // Mirror specification
+    class Mirror                                                                // Mirror specification
      {final float x, y, 𝘅, 𝘆, 𝕏, 𝕐;                                             // Mirror is through point(x,y) and point(𝘅, 𝘆), vector parallel to mirror
       final float 𝕩, 𝕪;                                                         // Unit vector normal to mirror pointing at the reflection
       final boolean both;                                                       // False - only stuff in front of the mirror is reflected as if we were observing from inside the drawing, else if true - everything is reflected as if we were observing from above
@@ -256,42 +399,53 @@ public class Activity extends android.app.Activity                              
       float opacity = 1;                                                        // 0-1 opacity multiplier for this mirror
       float 𝖃, 𝖄;                                                               // Reflection of the latest supplied point - not thread safe but much faster
       boolean reflection;                                                       // True - reflection, false - real
-      𝝫(float X, float Y, float A)                                              // Mirror line extends through point(x,y) at angle A
+      Mirror(float X, float Y, float A)                                         // Mirror line extends through point(x,y) at angle A
        {this( X, Y, X + cd(A), Y + sd(A), true, true, true);
        }
-      𝝫(float X, float Y, float 𝗫, float 𝗬)                                     // Mirror line extends through point(x,y) and point(𝘅, 𝘆)
+      Mirror(float X, float Y, float 𝗫, float 𝗬)                                // Mirror line extends through point(x,y) and point(𝘅, 𝘆)
        {this( X, Y, 𝗫, 𝗬, true, true, true);
        }
-      𝝫(float X, float Y, float 𝗫, float 𝗬,                                     // Mirror line extends through point(x,y) and point(𝘅, 𝘆) and reflects on one or both sides
+      Mirror(float X, float Y, float 𝗫, float 𝗬,                                // Mirror line extends through point(x,y) and point(𝘅, 𝘆) and reflects on one or both sides
         boolean Both, boolean ReflectReal, boolean ReflectReflections)
        {both = Both;                                                            // Whether to reflect on one or both sides
         reflectReal = ReflectReal;                                              // Reflect real vertices
-        reflectReflections = ReflectReflections;                                 // Reflect reflected vertices
+        reflectReflections = ReflectReflections;                                // Reflect reflected vertices
         x = X; y = Y; 𝘅 = 𝗫; 𝘆 = 𝗬;                                             // Mirror line
         𝕏 = 𝘅 - x; 𝕐 = 𝘆 - y;                                                   // Vector parallel to mirror
         final float d = d(𝕏, 𝕐);                                                // Length of vector parallel to mirror
         𝕩 = 𝕐 / d; 𝕪 = -𝕏 / d;                                                  // Unit vector normal to mirror pointing at the reflection
        }
-      boolean reflect(final float X, final float Y)                             // Point to reflect
+      boolean reflectInMirror(final float X, final float Y)                     // Point to reflect
        {final float d = pointToLine(X, Y, x, y, 𝘅, 𝘆);                          // Distance to mirror
         reflection = d >= 0;                                                    // True - the returned point is to the left of the line and is thus in reflected space.
         final int D = reflection || both ? 2 : 1;                               // Dump stuff behind the mirror in the mirror unless both specified
         𝖃 = X + D * d * 𝕩; 𝖄 = Y + D * d * 𝕪;
         return reflection;                                                      // True - the returned point is to the left of the line and is thus in reflected space.
        }
-      𝝫 opacity(final float Opacity) {opacity = Opacity; return this;}          // Set opacity
-     } // 𝝫
+      Mirror opacity(final float Opacity) {opacity = Opacity; return this;}     // Set opacity
+     } // Mirror
     int mirrorsRequired() {return mirrorsNone;}                                 // Override to specify which mnirrors should be drawn
-//------------------------------------------------------------------------------
-// 𝕿rack rotation about a centre so that the user can drag circularly
-//------------------------------------------------------------------------------
+/*------------------------------------------------------------------------------
+ 𝕿rack rotation about a centre so that the user can drag linearly and circularly
+
+Each drawable item can refer to a tracker to records its motion both in
+translation and in rotation around a point specified by the item.  Multiple
+items can refer to the same item so that dragging any one of them updates the
+referenced tracker.
+
+Trackers are not responsible for repositioning the item, this is done when by
+the caller when the drawing is created i.e - the trackers are used by the
+caller to update the position and configuration of the drawing and in so ding
+might well update the position of the dragged item.
+------------------------------------------------------------------------------*/
     class 𝝮                                                                     // Track drag rotation
      {final String name;                                                        // Name of rotation
       float Dx, Dy, lastTime, lastAngle;                                        // Start of last drag, time of last drag, angle at last drag
       float angle, speed, aldx, aldy;                                           // Current angle, angular speed, accumulated linear drag in x, accumulated linear drag in y
+      float radial, contraRadial;                                               // Drag along radius, across radius
       𝝮(final String Name) {name = Name;}                                       // Name to facilitate debugging
       𝝮(final String Name, float Angle) {name = Name; angle = Angle;}           // Name to facilitate debugging, initial angle
-      void updateMotion(boolean start,                                          // Start or continuation of drag
+      void updateMotion(final boolean start,                                    // Start or continuation of drag
         int reflectionDepth,                                                    // Reflection depth of selected item,
         float x, float y, float X, float Y)                                     // Track rotation about centre at point(x,y) of drag point(X, Y)
        {if (true)                                                               // Update rotation
@@ -306,11 +460,16 @@ public class Activity extends android.app.Activity                              
           lastTime  = T;                                                        // Update time of last motion event
           lastAngle = a;                                                        // Update last angle
          }
+        if (!start)                                                             // Update radial and cross radial drag
+         {final float r = d(X-x, Y-y) - d(Dx-x, Dy-y);                          // Radial drag
+          radial       += r;                                                    // Sum radial drag
+          contraRadial += os(r, d(X-Dx, Y-Dy));                                 // Contra radial is the other side of the drag vector from the radius
+         }
         if (!start)                                                             // Accumulated linear drag accounting for only upto a single mirror at the moment
          {final float dx = X - Dx, dy = Y - Dy;                                 // Delta in normal coordinates
           if      (reflectionDepth == 0) {aldx += dx; aldy += dy;}              // No reflection
           else if (reflectionDepth == 1)                                        // Reflected delta when on mirror present, where parallel to the mirror is not transformed, but away from the mirror is reversed
-           {final 𝝫 m = drawing.mirror1;
+           {final Mirror m = drawing.mirror1;
             final float d = 2 * pointToLine(X, Y, Dx, Dy, Dx + m.𝕏, Dy + m.𝕐);  // Twice distance to mirror to get reflection of drag
             aldx += dx + d * m.𝕩;                                               // Mirror normal in x
             aldy += dy + d * m.𝕪;                                               // Mirror normal in y
@@ -329,6 +488,10 @@ public class Activity extends android.app.Activity                              
     void sra1(final int a) {if (nearAngle(𝞈1.angle, a) < 1) 𝞈1.angle = a;}      // Set rotation tracker 1 angle angle when close to an interesting angle
     void sra2(final int a) {if (nearAngle(𝞈2.angle, a) < 1) 𝞈2.angle = a;}      // Set rotation tracker 2 angle angle when close to an interesting angle
     void sra3(final int a) {if (nearAngle(𝞈3.angle, a) < 1) 𝞈3.angle = a;}      // Set rotation tracker 3 angle angle when close to an interesting angle
+    boolean makeTracing()                                                       // Tracing possible if rotated or translation
+     {return a(𝞈Rotation.angle) > closeEnoughAngle ||                           // Rotated
+             d(𝞈Translation.aldx, 𝞈Translation.aldy) > innerThickness();        // Translated
+     }
 /*------------------------------------------------------------------------------
 𝕯rawings are comprised of various geometric shapes known generically as items.
 Each item is drawn in two layers, the lower layer more spread out, the upper
@@ -340,20 +503,25 @@ number of vertices in each layer for each item.
       final Stack<Item> items = new Stack<Item>();                              // Items used to draw this drawing
       float[]vertices;                                                          // Vertex array
       int[]colours;                                                             // This must be the same dimension as vertices, but only the colours in the first half are used
+      boolean reflectAll = true, traceAll = true;                               // If all items should be reflected or traced without exceptions we can make some optimizations
       boolean[]doNotReflect, doNotTrace;                                        // Whether this vertex should be reflected or not, traced or not
       int layer;                                                                // Current layer
       int numberOfCoordinates, numberOfVertexPairs;                             // Number of coordinates, number of pairs of points
-      int mirrorBlockSize, rotationBlockSize;                                   // Size of unmirrored base in pairs of coordinate pairs, size of rotation block = all mirrored data
-      𝝫 mirror1, mirror2;                                                       // Mirror definition chosen or null for no mirror - upto two mirrors allowed
+      int mirrorBlockSize, tracingBlockSize;                                    // Size of unmirrored base in pairs of coordinate pairs, size of rotation block = all mirrored data
+      Mirror mirror1, mirror2;                                                  // Mirror definition chosen or null for no mirror - upto two mirrors allowed
       float tracingRotationOpacity = 1;                                         // Opacity multiplier for rotated tracing if present
       Float tracingRotationCentreX;                                             // Centre of rotation of drawing - X - else centre of drawing
       Float tracingRotationCentreY;                                             // Centre of rotation of drawing - Y - else centre of drawing
       int mirrors()      {return mirror2 != null ? 2 : mirror1 != null ? 1 : 0;}// Number of active mirrors
       int mirrorBlocks() {return mirror2 != null ? 5 : mirror1 != null ? 2 : 1;}// Number of blocks of data = unmirrored plus mirrored - mirrors are normalized so abbreviated tests are ok
       int tracingBlocks(){return makeTracing ? 2 : 1;}                          // Double the number of vertices if a tracing of the drawing is being rotated
-      boolean makeTracing = a(𝞈Rotation.angle) > closeEnoughAngle || d(𝞈Translation.aldx, 𝞈Translation.aldy) > innerThickness();  // Do tracing id tracing angle shows movement from zero
+      boolean makeTracing = makeTracing();                                      // Do tracing if tracing angle shows movement from zero or translation has been applied
       void allocate()                                                           // Allocate the vertex arrays
-       {for(final Item i: items) i.setSelectedColours();                        // Set selected colours for each item based in unselected colours
+       {for(final Item i: items)                                                // Preprocess items
+         {i.setSelectedColours();                                               // Set selected colours for each item based in unselected colours
+          reflectAll = reflectAll && i.reflect();                               // All items are to be reflected
+          traceAll   = traceAll   && i.trace();                                 // All items are to be traced on the tracing
+         }
         int N = 0;                                                              // Number of pairs of vertices to use plus fire breaks
         for(layer = 0; layer < layers; ++layer)                                 // Each layer
          {for(final Item i: items)                                              // Add vertex pairs and colours for each item
@@ -364,13 +532,13 @@ number of vertices in each layer for each item.
          }
         final int M = mirrorBlocks(), R = tracingBlocks();                      // Number of blocks of data required to accommodate reflections and tracing rotations
         mirrorBlockSize     = N;                                                // Record mirror block size
-        rotationBlockSize   = N * M;                                            // Block subject to rotation = all mirrored data
+        tracingBlockSize    = N * M;                                            // Block subject to rotation = all mirrored data
         numberOfVertexPairs = N * M * R;                                        // Number of pairs of points including fire breaks
         numberOfCoordinates = coordsPerVertexPair * numberOfVertexPairs;        // Number of coordinates including fire breaks
-        vertices            = new float[numberOfCoordinates];                   // A vertex is represented by two coordinates
-        colours             = new int  [numberOfCoordinates];                   // The colours array must be the same size, only the first half is actually loaded
-        doNotReflect        = new boolean[mirrorBlockSize];                     // Reflect this vertex or not - chosen this way around for default and therefore fast initialization of this array
-        doNotTrace          = new boolean[mirrorBlockSize];                     // Trace this vertex or not - chosen this way around for default and therefore fast initialization of this array
+        vertices = new float[numberOfCoordinates];                              // A vertex is represented by two coordinates
+        colours  = new int  [numberOfCoordinates];                              // The colours array must be the same size, only the first half is actually loaded
+        if (!reflectAll) doNotReflect = new boolean[mirrorBlockSize];           // Reflect this vertex or not - chosen this way around for default and therefore fast initialization of this array
+        if (!traceAll)   doNotTrace   = new boolean[mirrorBlockSize];           // Trace this vertex or not - chosen this way around for default and therefore fast initialization of this array
        }
       void loadVertices()                                                       // Load the vertices to be drawn
        {final float[]v = vertices;                                              // Shorten name
@@ -393,10 +561,9 @@ number of vertices in each layer for each item.
             v[𝘀-3] = v[𝘀-1] = v[𝘀+1];                                           // Half fire break at start Y
             N = s + nV;                                                         // Move up
             if (𝗹) i.endVertexPair = N;                                         // Record 1 past final vertex pair for this item in layer 0
-            for(int j = s; j < N; ++j)                                          // Set reflection and tracing for this vertex
-             {doNotReflect[j] = !i.reflect();                                   // Set whether this vertex should be reflected - OPT: use java.lang.Arrays.fill()
-              doNotTrace  [j] = !i.trace();                                     // Set whether this vertex should be traced    - OPT: use java.lang.Arrays.fill()
-             }
+            final boolean nr = !i.reflect(), nt = !i.trace();                   // No reflection or tracing required for this item
+            if (!reflectAll) java.util.Arrays.fill(doNotReflect, s, N, nr);     // Set reflection for vertices associated with this item
+            if (!traceAll)   java.util.Arrays.fill(doNotTrace,   s, N, nt);     // Set tracing for vertices associated with this item
             final int 𝗲 = N * n;                                                // Half fire break at end
             v[𝗲+0] = v[𝗲+2] = v[𝗲-2];                                           // X
             v[𝗲+1] = v[𝗲+3] = v[𝗲-1];                                           // Y
@@ -405,34 +572,34 @@ number of vertices in each layer for each item.
          }
        }
       void reflectVertices()                                                    // Reflect each point
-       {final 𝝫 m1 = mirror1, m2 = mirror2;                                     // Mirror order will have been normalized when the mirrors were activated
+       {final Mirror m1 = mirror1, m2 = mirror2;                                // Mirror order will have been normalized when the mirrors were activated
         if (m1 == null) return;                                                 // No mirrors present
         final int 𝗻 = mirrorBlockSize*coordsPerVertexPair, n = 𝗻 / 2;           // Number of entries in vertex array for base unmirrored section, number of points to reflect
         for(int i = 0; i < n; ++i)                                              // Each coordinate pair
-         {if (doNotReflect[i/2]) continue;                                      // Skip reflection of vertex if not reflected
+         {if (!reflectAll && doNotReflect[i/2]) continue;                       // Skip reflection of vertex if not reflected
           final int j = 2*i, 𝗷 = j + 1;                                         // x,y vertices for this coordinate pair
           final float x = vertices[j], y = vertices[𝗷];                         // Coordinates of vertex
 
-          m1.reflect(x, y);                                                     // Reflect original in first mirror
+          m1.reflectInMirror(x, y);                                             // Reflect original in first mirror
           final float x1 = m1.𝖃, y1 = m1.𝖄;
           if (m1.reflectReal)                                                   // Reflect real vertices
            {vertices  [1*𝗻+j] = x1;   vertices[1*𝗻+𝗷] = y1;
            }
 
           if (m2 != null)
-           {m2.reflect(x, y);                                                   // Reflect original in second mirror
+           {m2.reflectInMirror(x, y);                                           // Reflect original in second mirror
             final float x2 = m2.𝖃, y2 = m2.𝖄;
             if (m2.reflectReal)                                                 // Reflect real vertices
              {vertices[2*𝗻+j] = x2;   vertices[2*𝗻+𝗷] = y2;
              }
             if (m1.reflectReflections)                                          // Reflect reflection in second mirror in first mirror
-             {m1.reflect(x2, y2);
+             {m1.reflectInMirror(x2, y2);
               final float x12 = m1.𝖃, y12 = m1.𝖄;
               vertices[3*𝗻+j] = x12; vertices[3*𝗻+𝗷] = y12;
              }
 
             if (m2.reflectReflections)                                          // Reflect reflection in second mirror in first mirror
-             {m2.reflect(x1, y1);
+             {m2.reflectInMirror(x1, y1);
               final float x21 = m2.𝖃, y21 = m2.𝖄;
               vertices[4*𝗻+j] = x21; vertices[4*𝗻+𝗷] = y21;
              }
@@ -442,7 +609,7 @@ number of vertices in each layer for each item.
       void reflectColours()                                                     // Reflect colour for each point by halving their opacity
        {if (mirror1 == null) return;                                            // No mirrors present
         final boolean 𝗺 = mirror2 != null;                                      // Presence of each mirror
-        final 𝝫 m1 = mirror1, m2 = mirror2;                                     // Shorten names of mirrors whose order will already have been normalized
+        final Mirror m1 = mirror1, m2 = mirror2;                                // Shorten names of mirrors whose order will already have been normalized
         final float   o1 =      m1.opacity;                                     // Opacity of mirrors
         final float   o2 = 𝗺 ? m2.opacity : 1;
         final boolean u1 = o1 != 1, u2 = o2 != 1;                               // Opacity requires adjustment
@@ -450,21 +617,22 @@ number of vertices in each layer for each item.
         final int p4 = 0xff;                                                    // Mask for least significant byte
 
         for(int i = 0; i < n; ++i)                                              // Reflect color
-         {final int C = colours[i],                                             // Colour
+         {final int 𝗶 = i;                                                      // Finalize
+          final int C = colours[i],                                             // Colour
             a  = (C>>24) & p4, r = (C>>16) & p4, g = (C>>8) & p4, b = C & p4,   // Alpha,  Colour components
             𝗴 = g>>1,                                                           // Filtered colour components for mirror 2 which absorbs green
             a0 = a,                                                             // Filtered alpha for mirror 1 - no change in opacity - let colour filtering do the job
             a1 = u1 ? i(o1 * a0) : a0;                                          // Filtered alpha for mirror 1 including mirror opacity if necessary
 
-          colours[1*n+i] = a1<<24 | r<<16 | 𝗴<<8 | b;                           // Mirror 1 absorbs green light
+          colours[1*n+𝗶] = a1<<24 | r<<16 | 𝗴<<8 | b;                           // Mirror 1 absorbs green light
 
           if (𝗺)                                                                // Mirror 2
            {final int                                                           // Colour
               a2 = u2 ? i(o2 * a0) : a0,                                        // Filtered alpha for mirror 2
               𝗿  = r>>1,                                                        // Filtered colour components for mirror 1 which absorbs red
               a3 = (a1*a2)>>8;                                                  // Filtered alpha for reflections in both mirrors
-            colours[2*n+i] = a2<<24 | 𝗿<<16 | g<<8 | b;                         // Mirror 2 absorbs red light
-            colours[3*n+i] = colours[4*n+i] = a3<<24 | 𝗿<<16 | 𝗴<<8 | b;        // Secondary reflections
+            colours[2*n+𝗶] = a2<<24 | 𝗿<<16 | g<<8 | b;                         // Mirror 2 absorbs red light
+            colours[3*n+𝗶] = colours[4*n+𝗶] = a3<<24 | 𝗿<<16 | 𝗴<<8 | b;        // Secondary reflections
            }
          }
        }
@@ -519,69 +687,76 @@ number of vertices in each layer for each item.
         final int[]𝗰 = colours;                                                 // Shorten name         1 2     21
         if (mirror2 == null)                                                    // One reflection: swap AaBb to BAba
          {for(int i = 0; i < 𝗻; ++i)                                            // Each coordinate pair
-           {final int
-              A = 𝗰[0*𝗻+i],
-              a = 𝗰[1*𝗻+i],
-              B = 𝗰[2*𝗻+i],
-              b = 𝗰[3*𝗻+i];
-            𝗰[0*𝗻+i] = B;                                                       // Swap
-            𝗰[1*𝗻+i] = A;
-            𝗰[2*𝗻+i] = b;
-            𝗰[3*𝗻+i] = a;
+           {final int 𝗶 = i,                                                    // Finalize to optimize
+              A = 𝗰[0*𝗻+𝗶],
+              a = 𝗰[1*𝗻+𝗶],
+              B = 𝗰[2*𝗻+𝗶],
+              b = 𝗰[3*𝗻+𝗶];
+            𝗰[0*𝗻+𝗶] = B;                                                       // Swap
+            𝗰[1*𝗻+𝗶] = A;
+            𝗰[2*𝗻+𝗶] = b;
+            𝗰[3*𝗻+𝗶] = a;
            }
          }                                                                      //                       1 2 3 4 5     54321
         else                                                                    // Two reflections: swap AaBbCcDdEe to EDCBAedcba - this is somewhat arbitrary
          {for(int i = 0; i < 𝗻; ++i)                                            // Each coordinate pair
-           {final int
-              A = 𝗰[0*𝗻+i],
-              a = 𝗰[1*𝗻+i],
-              B = 𝗰[2*𝗻+i],
-              b = 𝗰[3*𝗻+i],
-              C = 𝗰[4*𝗻+i],
-              c = 𝗰[5*𝗻+i],
-              D = 𝗰[6*𝗻+i],
-              d = 𝗰[7*𝗻+i],
-              E = 𝗰[8*𝗻+i],
-              e = 𝗰[9*𝗻+i];
-            𝗰[0*𝗻+i] = E;                                                       // Swap
-            𝗰[1*𝗻+i] = D;
-            𝗰[2*𝗻+i] = C;
-            𝗰[3*𝗻+i] = B;
-            𝗰[4*𝗻+i] = A;
-            𝗰[5*𝗻+i] = e;
-            𝗰[6*𝗻+i] = d;
-            𝗰[7*𝗻+i] = c;
-            𝗰[8*𝗻+i] = b;
-            𝗰[9*𝗻+i] = a;
+           {final int 𝗶 = i,                                                    // Finalize to optimize
+              A = 𝗰[0*𝗻+𝗶],
+              a = 𝗰[1*𝗻+𝗶],
+              B = 𝗰[2*𝗻+𝗶],
+              b = 𝗰[3*𝗻+𝗶],
+              C = 𝗰[4*𝗻+𝗶],
+              c = 𝗰[5*𝗻+𝗶],
+              D = 𝗰[6*𝗻+𝗶],
+              d = 𝗰[7*𝗻+𝗶],
+              E = 𝗰[8*𝗻+𝗶],
+              e = 𝗰[9*𝗻+𝗶];
+            𝗰[0*𝗻+𝗶] = E;                                                       // Swap
+            𝗰[1*𝗻+𝗶] = D;
+            𝗰[2*𝗻+𝗶] = C;
+            𝗰[3*𝗻+𝗶] = B;
+            𝗰[4*𝗻+𝗶] = A;
+            𝗰[5*𝗻+𝗶] = e;
+            𝗰[6*𝗻+𝗶] = d;
+            𝗰[7*𝗻+𝗶] = c;
+            𝗰[8*𝗻+𝗶] = b;
+            𝗰[9*𝗻+𝗶] = a;
            }
          }
        }
       void tracingVertices()                                                    // If tracing rotation is in effect - copy and rotate the drawing around the centre into the upper rotation block
        {if (!makeTracing) return;                                               // No tracing rotation present
-        final int 𝗻 = rotationBlockSize*coordsPerVertexPair/2, n = 𝗻 * 2;       // Number of coordinates, distance to copy and rotate
+        final int 𝗻 = tracingBlockSize*coordsPerVertexPair/2, n = 𝗻 * 2;        // Number of coordinates, distance to copy and rotate
         final float[]v = vertices;                                              // Shorten name         1 2     21
         final float  a = 𝞈Rotation.angle, 𝘅 = cd(a), 𝘆 = sd(a),                 // Unit vector of rotation
           X = f(tracingRotationCentreX, cx), Y = f(tracingRotationCentreY, cy), // Coordinates of centre of rotation
           dx = 𝞈Translation.aldx, dy = 𝞈Translation.aldy;                       // Translation tracker
         final int m = mirrorBlockSize;                                          // Number of vertices in a mirror block
-        for(int i = 0; i < 𝗻; ++i)                                              // Each coordinate pair - OPT: use a matrix instead of this loop
-         {if (doNotTrace[(i%m)/2]) continue;                                    // Skip tracing of vertex if not traced
-          final float x = v[2*i], y = v[2*i+1], 𝕩 = x - X, 𝕪 = y - Y;           // Vector from centre
-          v[n+2*i] = X + 𝘅*𝕩 - 𝘆*𝕪 + dx; v[n+2*i+1] = Y + 𝘅*𝕪 + 𝘆*𝕩 + dy;       // Vector rotated around centre and translated if required
+        final Matrix 𝝻 = tracingMatrix; 𝝻.reset();                              // Tracing matrix
+        𝝻.postTranslate(dx, dy);                                                // Translation is first as it is expressed in the unrotated frame
+        𝝻.postRotate(a, X, Y);                                                  // Rotation next
+        𝝻.mapPoints(v, n, v, 0, 𝗻);                                             // Trace all points
+        if (!traceAll)                                                          // Zero vertices that requested that they be exempted from tracing
+         {for(int i = 0; i < n; i+=4)                                           // Each coordinate pair - OPT: use a matrix instead of this loop
+           {if (doNotTrace[(i/4)%m])                                            // Zero vertex because it requested no tracing
+             {final int 𝗶 = n+i;
+              v[𝗶] = v[𝗶+1] = v[𝗶+2] = v[𝗶+3] = 0;
+             }
+           }
          }
        }
       void tracingColours()                                                     // If tracing rotation is in effect - duplicate the colour block
        {if (!makeTracing) return;                                               // No rotation present
-        final int  n = rotationBlockSize*2;                                     // Number of entries to be rotated
+        final int  n = tracingBlockSize*2;                                      // Number of entries to be rotated
         final int[]c = colours;                                                 // Shorten name
-        for(int i = 0; i < n; ++i) c[n+i] = c[i];                               // Duplicate colours - OPT: use System.arraycopy instead
+        System.arraycopy(c, 0, c, n, n);                                        // Duplicate colours
         if (tracingRotationOpacity != 1)                                        // Multiply in rotation opacity if present
          {final float o = tracingRotationOpacity;                               // Overall opacity to be multiplied in
           if (o == 0) {for(int i = 0; i < n; ++i) c[n+i] &= 0x00ffffff;}        // Special case - zero
           else
            {for(int i = 0; i < n; ++i)                                          // Multiply opacity
-             {final int 𝗰 = c[n+i], a = i((𝗰>>24)*o)<<24;                       // New opacity
-              c[n+i] = (𝗰&0x00ffffff)|a;                                        // Set opacity
+             {final int 𝗶 = i, 𝗰 = c[n+𝗶], a = i((𝗰>>24)*o)<<24;                // Finalize to optimize, new opacity
+              c[n+𝗶] = (𝗰&0x00ffffff)|a;                                        // Set opacity
              }
            }
          }
@@ -619,33 +794,36 @@ number of vertices in each layer for each item.
         return S;                                                               // Return top most item if there is is one
        }
 //------------------------------------------------------------------------------
-// Create mirrors
+// 𝕮reate mirrors
 //------------------------------------------------------------------------------
-      𝝫 createMirror(int n) {return createMirror(n == 1 ? 𝞈1 : 𝞈2, n);}         // Default mirror 1 - horizontal, 2 - vertical, two sided
-      𝝫 createMirror(final 𝝮 𝞇, int n)                                          // Horizontal(1) or vertical(2) mirror at centre, two sided
-       {return createMirror(𝞇, n, cx, cy, n == 1 ? 0 : 90, true, true, true);
+      Mirror createMirror(int n) {return createMirror(n == 1 ? 𝞈1 : 𝞈2, n);}    // Default mirror 1 - horizontal, 2 - vertical, two sided
+      Mirror createMirror(final 𝝮 𝞇, int n)                                     // Horizontal(1) or vertical(2) mirror at centre, two sided
+       {//return createMirror(𝞇, n, cx, cy, n == 1 ? 0 : 90);                   // Should mirror two be special? Probably not!
+        return createMirror(𝞇, n, cx, cy, 0);
        }
-      𝝫 createMirror(final 𝝮 𝞇, int n, float a)                                 // Mirror at centre with angle(a) and specified tracker
-       {return createMirror(𝞇, n, cx, cy, a, true, true, true);
+      Mirror createMirror(final 𝝮 𝞇, int n, float a)                            // Mirror at centre with angle(a) and specified tracker
+       {return createMirror(𝞇, n, cx, cy, a);
        }
-      𝝫 createMirror(int n, float X, float Y, float a)                          // Mirror from polar coordinates with no tracker, two sided
-       {return createMirror(null, n, X, Y, a, true, true, true);
+      Mirror createMirror(int n, float X, float Y, float a)                     // Mirror from polar coordinates with no tracker, two sided
+       {return createMirror(null, n, X, Y, a);
        }
-      𝝫 createMirror(int n, float X, float Y, float a, boolean both)            // Mirror from polar coordinates with no tracker, one or two sided
-       {return createMirror(null, n, X, Y, a, both, true, true);
+      Mirror createMirror(int n, float X, float Y, float a, boolean both)       // Mirror from polar coordinates with no tracker, one or two sided
+       {return createMirror(null, n, X, Y, a, both, true, true, true);
        }
-      𝝫 createMirror(𝝮 𝞇, int n, float X, float Y, float a)                     // Mirror from polar coordinates origin at point (X, Y), angle(a), two sided
-       {return createMirror(𝞇, n, X, Y, a, true, true, true);
+      Mirror createMirror(𝝮 𝞇, int n, float X, float Y, float a)                // Mirror from polar coordinates origin at point (X, Y), angle(a), two sided
+       {return createMirror(𝞇, n, X, Y, a, true, true, true, true);
        }
-      𝝫 createMirror(final 𝝮 𝞇, final int n, final float X, final float Y,      // Mirror from polar coordinates origin at point (X, Y), angle(a) and one or two sided
+      Mirror createMirror(final 𝝮 𝞇, final int n, final float X, final float Y, // Mirror from polar coordinates origin at point (X, Y), angle(a) and one or two sided
         final float a,                                                          // Angle of mirror
         final boolean both,                                                     // Both sides reflect
-        final boolean reflectReal, final boolean reflectReflections)            // Reflect real vertices, reflect reflected vertices
+        final boolean reflectReal,                                              // Reflect real vertices
+        final boolean reflectReflections,                                       // Reflect reflected vertices
+        final boolean reflectMirrors)                                           // Reflect mirrors
        {final int r = mirrorsRequired();
         if ((r & n) == 0) return null;                                          // Mirror not required
- //     final float 𝗮 = a + (𝞇 != null ? 𝞇.angle : 0);                          // Mirror has no rotation tracker
-        final float 𝗮 = a;                                                      // Mirror rotation
-        final 𝝫 𝞅 = new 𝝫(X, Y, X + cd(𝗮), Y + sd(𝗮),                           // Create the reflector of the mirror
+        final float 𝗮 = a + (𝞇 != null ? 𝞇.angle : 0);                          // Mirror has no rotation tracker
+//        final float 𝗮 = a;                                                    // Mirror rotation
+        final Mirror 𝞅 = new Mirror(X, Y, X + cd(𝗮), Y + sd(𝗮),                           // Create the reflector of the mirror
           both, reflectReal, reflectReflections);                               // What gets reflected
         if (mirror1 == null) mirror1 = 𝞅; else mirror2 = 𝞅;                     // Normalize mirror positions
         final boolean m1 = mirror1 == 𝞅;                                        // Which mirror
@@ -657,11 +835,13 @@ number of vertices in each layer for each item.
            c1 = m1 ? 0xff0000 : 0x00ff00;                                       // Mirror 1 absorbs red, mirror2 absorbs green
            c2 = m1 ? 0x0000ff : 0x0000ff;
            C  = m1 ? 0xff00ff : 0x00ffff;
+           C  = null;                                                           // Try mirrors without central line to better distinguish them from geometric items
+           reflect = reflectMirrors;                                            // Whether this mirror can reflect other mirrors or not
          }};
         return 𝞅;                                                               // Return created mirror
        }
 //------------------------------------------------------------------------------
-// Selected item
+// 𝕾elected item
 //------------------------------------------------------------------------------
       class SelectedItem
        {final Drawing.Item item;                                                // Selected item
@@ -691,8 +871,8 @@ number of vertices in each layer for each item.
         int c1, c2;                                                             // Colours of background
         Integer C;                                                              // Colours of foreground or null if foreground not to be drawn
         String n;                                                               // Name of item interned for fast compares to identify the selected item - should be unique across this drawing
-        𝝮 𝞈;                                                                    // Drag rotation angle around point(x,y)
-        Float 𝕩, 𝕪;                                                             // Centre of rotation in x,y uses point(x,y) if not set
+        𝝮 𝞈;                                                                    // Drag rotation angle around point(𝕩,𝕪)
+        Float 𝕩, 𝕪;                                                             // Centre around which rotation is measured: uses point(x,y) if not set. tracingRotationCentreX/Y is the centre around which the drawing is actually rotated
         boolean reflect = true, trace = true;                                   // Reflect/Trace this item by default
         Matrix 𝝻;                                                               // Transformation matrix to be applied to vertices describing this item if not null
         private int N;                                                          // Number of vertices
@@ -782,7 +962,8 @@ number of vertices in each layer for each item.
            {for(int j = k*m-1; j >= 0; --j)                                     // Reflection block
              {final int b = j * n, s = b + S, t = b + T;                        // Block start and end for this item in lower layer
               for(int i = s; i <= t; i += 2)                                    // Each triangle in the strip in the item in the lower layer in the block
-               {if (inside(x, y, p[i+0],p[i+1],p[i+2],p[i+3],p[i+4],p[i+5]))    // See if the point is inside the current triangle
+               {final int 𝗶 = i;                                                // Finalize to optimize
+                 if (inside(x, y, p[𝗶+0],p[𝗶+1],p[𝗶+2],p[𝗶+3],p[𝗶+4],p[𝗶+5]))   // See if the point is inside the current triangle
                  {return new SelectedItem(this, j);                             // Found a containing triangle in block j
                  }
                }
@@ -871,7 +1052,8 @@ number of vertices in each layer for each item.
       abstract class Rectangle extends Item                                     // Rectangle centred at x,y width r, height R, angle a
        {Rectangle() {}
         Rectangle(Values Values) {values = Values;}
-        final int nVertexPairsPerSide = 64;                                     // Number of vertex pairs per side
+//      final int nVertexPairsPerSide = 64;                                     // Number of vertex pairs per side
+        final int nVertexPairsPerSide = 2;                                      // Number of vertex pairs per side
         int numberOfVertexPairs() {return 2*nVertexPairsPerSide+2;}             // The number of vertex pairs this item uses
         void addVertices(final int start)                                       // Add the vertices starting at this position in the vertices array
          {final float a = -a(),      𝗮 = a + 90, r = r(), R = R(),
@@ -913,10 +1095,11 @@ number of vertices in each layer for each item.
             int   c1() {return diameterItem.c1();}
             int   c2() {return diameterItem.c2();}
             Integer C() {return diameterItem.C();}
-            float r0() {return super.r0() / (radius() ? 2f : 1f);}
+            float r0() {return super.r0() / (radius() ? 2f : 1f);}              // Why super and not diameterItem ???
             float r1() {return super.r1() / (radius() ? 2f : 1f);}
             float x()  {return super.x() + (radius() ? super.r0()/2f * cd(super.a()) : 0f);}
             float y()  {return super.y() + (radius() ? super.r0()/2f * sd(super.a()) : 0f);}
+            boolean reflect() {return diameterItem.reflect();}                  // Whether this diameter is being reflected or not
            };
           placeSemiCircle(-1);                                                  // Left end semi-circle
           placeSemiCircle(+1);                                                  // Right end semi-circle
@@ -931,6 +1114,7 @@ number of vertices in each layer for each item.
             float  x() {return diameterItem.x() + left(sign) * diameterItem.r() * cd(diameterItem.a());}
             float  y() {return diameterItem.y() + left(sign) * diameterItem.r() * sd(diameterItem.a());}
             float  a() {return diameterItem.a() - sign * 90;}
+            boolean reflect() {return diameterItem.reflect();}                  // Whether this diameter is being reflected or not
            };
          }
         private   int left(int sign) {return sign < 0 && radius() ? 0 : sign;}  // Places left hand end of radius
@@ -1020,7 +1204,7 @@ number of vertices in each layer for each item.
            };
          }
        } // Triangle
-      abstract class PolyArea extends Item                                      // Polygonal Area
+      abstract class PolyArea extends Item                                      // Polygonal Area represented as one triangle per side
        {final float[]xy;                                                        // Coordinates array
         final float x, y;                                                       // Centre coordinates
         PolyArea(final float...XY)                                              // Array of coordinates of vertices
@@ -1062,7 +1246,7 @@ number of vertices in each layer for each item.
          }
        } // Tab
 //------------------------------------------------------------------------------
-// Special purpose items - tracing controllers
+// 𝕾pecial purpose items - tracing controllers
 //------------------------------------------------------------------------------
       void offerToRotateTracing()                                               // Tracing rotation controller in standard position rotating about centre with full opacity
        {final float r = baseRadius() / 2;
@@ -1077,12 +1261,12 @@ number of vertices in each layer for each item.
         {{n = "TracingRotationController";                                      // Unique name so that this item can be selected
           𝞈 = 𝞈Rotation;                                                        // Rotation tracker to use
           tracingRotationCentreX = X; tracingRotationCentreY = Y;               // Centre of rotation
+          tracingRotationOpacity = opacity;                                     // Opacity of the drawing
           x = 𝘅; y = 𝘆;                                                         // Position of the controller
-          𝕩 = f(X, cx);    𝕪 = f(Y, cy);                                        // Centre of rotation
+          𝕩 = f(X, cx);    𝕪 = f(Y, cy);                                        // Centre of rotation - this is the centre around which rotation is measured - but tracingRotationCentreX/Y is the centre around which the drawing is actually rotated
           R = rotationTracingControllerRadius();                                // Size of the controller
           c1 = 𝝺sb; c2 = 𝝺sc;                                                   // The colours of the controller
           reflect = false;                                                      // Do not reflect the controller
-          tracingRotationOpacity = opacity;                                     // Opacity of the drawing
         }};
        }
       float rotationTracingControllerRadius() {return 4*outerThickness();}      // Size of the tracing rotation controller
@@ -1093,7 +1277,77 @@ number of vertices in each layer for each item.
 
       void underlay() {}                                                        // Highlights drawn under the drawing
       void overlay () {}                                                        // Highlights drawn over the drawing
-
+//------------------------------------------------------------------------------
+// 𝕽emember the position of lines and circles drawn during the overlay phase so
+// that we can find the colour of the one the user is touching and then adjust
+// the opacity of the other lines to make the touched line clearer. As speed is
+// desirable and there cannot be so many lines and circles on the screen for
+// the user to touch: use a fixed area of no great size as it will be searched
+// sequentially.
+// I spent 𝕮hristmas 𝕰ve writing this, but in fact dashed lines turned out to be
+// much more effective visually and much faster to implement - so there.
+//------------------------------------------------------------------------------
+//    class ColourAtTouch                                                       // Save the positions of some lines and circles and their associated colour so that we can retrieve the color of a specific point at a later time
+//     {final int 𝗻;                                                            // Number of objects to save
+//      final boolean[]circleNotLine;                                           // True - circle, false - line
+//      final float[]x,y,𝘅,𝘆,𝗿;                                                 // Line start/Circle centre, line end, radius
+//      final int[]𝗰;                                                           // Colour associated with line or circle
+//      int p = 0;                                                              // Position in save area
+//      ColourAtTouch(final int n)                                              // Size of save area
+//       {𝗻 = n;                                                                // Save area size
+//        circleNotLine = new boolean[𝗻];  𝗰 = new int[𝗻];                      // Allocate save areas
+//        x = new float[𝗻]; y = new float[𝗻]; 𝘅 = new float[𝗻]; 𝘆 = new float[𝗻];
+//        𝗿 = 𝘅;                                                                // Reuse unused space
+//       }
+//      void line(float X, float Y, float 𝗫, float 𝗬, int C)                    // Line definition
+//       {x[p] = X; y[p] = Y; 𝘅[p] = 𝗫; 𝘆[p] = 𝗬;                               // Start and end coordinates
+//        𝗰[p] = C; if (p < 𝗻-1) ++p;                                           // Save colour of line and move up if room
+//       }
+//      void circle(float X, float Y, float R, int C)                           // Circle definition
+//       {x[p] = X; y[p] = Y; 𝗿[p] = R;                                         // Centre coordinates and radius
+//        circleNotLine[p] = true;                                              // Mark as circle
+//        𝗰[p] = C; if (p < 𝗻-1) ++p;                                           // Save colour of circle and move up if room
+//       }
+//      int touchedColour(float X, float Y)                                     // Find the uppermost colour the user is touching
+//       {for(int I = p - 1; I >= 0; --I)                                       // Go backwards to get latest element drawn
+//         {final int i = I;                                                    // Finalize
+//          if (circleNotLine[i])                                               // Circle
+//           {final float d = d(X - x[i], Y - y[i]), r = 𝗿[i];                  // Distance from centre
+//            if (d > 0.99*r && d < 1.01*r) return 𝗰[i];                        // Touching the circle's circumference!
+//           }
+//          else                                                                // Line
+//           {final float d = d(X-x[i], Y-y[i]) + d(𝘅[i]-X, 𝘆[i]-Y),            // Distance from each end
+//              𝗱 = d(𝘅[i]-x[i], 𝘆[i]-y[i]);                                    // Length of line segment
+//            if (d >= 0.999*𝗱 && d < 1.02*𝗱) return 𝗰[i];                      // On line by Schartz inequality
+//           }
+//         }
+//        return 0;                                                             // Unlikely to draw with this colour
+//       }
+//     } // ColourAtTouch
+//
+//    final ColourAtTouch ColourAtTouch = ColourAtTouchWanted() == 0 ? null :
+//      new ColourAtTouch(ColourAtTouchWanted());                               // Allocate only if facility needed
+//
+//    void drawLine(final RectF r) {drawLine(r.left, r.top, r.right, r.bottom);}// These draw routines save their colours so we can question what colour the user is touching
+//    void drawLine(final float x, final float y, final float 𝘅, final float 𝘆) // Draw line and save colour
+//     {if (ColourAtTouch != null) ColourAtTouch.line(x, y, 𝘅, 𝘆, paint.getColor());
+//      canvas.drawLine(x, y, 𝘅, 𝘆, paint);
+//     }
+//    void drawLines(final float[]lines)                                        // Draw a set of lines and save colour
+//     {if (ColourAtTouch != null)
+//       {final int c = paint.getColor(), n = lines.length;
+//        final float[]l = lines;                                               // Shorten name
+//        for(int p = 0; p < n; p += 4)                                         // Each line
+//         {final int i = p;
+//          ColourAtTouch.line(l[i+0], l[i+1], l[i+2], l[i+3], c);              // Save line details
+//         }
+//       }
+//      canvas.drawLines(lines, paint);
+//     }
+//    void drawCircle(final float x, final float y, final float 𝗿)              // Draw circle and save colour
+//     {if (ColourAtTouch != null) ColourAtTouch.circle(x, y, 𝗿, paint.getColor());
+//      canvas.drawCircle(x, y, 𝗿, paint);
+//     }
      } // Drawing
 //------------------------------------------------------------------------------
 // 𝖀seful routines for creating drawings
@@ -1127,43 +1381,77 @@ number of vertices in each layer for each item.
 //------------------------------------------------------------------------------
 // 𝖀seful functions from Vectors2D - see: metacpan.org/author/PRBRENAN
 //------------------------------------------------------------------------------
-    boolean intersection(PointF p,                                              // Intersection of two lines loaded into point(p)
-      float x11, float y11, float x12, float y12,
-      float x21, float y21, float x22, float y22)
+    final float nearness = 1e-6f;                                               // The length at which digital geometry departs from reality
+    boolean intersection(final PointF p,                                        // Intersection of two lines loaded into point(p)
+      final float x11, final float y11, final float x12, final float y12,
+      final float x21, final float y21, final float x22, final float y22)
      {final float x = x11 - x21, 𝘅 = x12 - x11, 𝕩 = x22 - x21,
                   y = y11 - y21, 𝘆 = y12 - y11, 𝕪 = y22 - y21,
                   d = 𝘆*𝕩 - 𝘅*𝕪;
-      if (a(d) < 1e-6) return false;                                            // Points too close relative to intersection
+      if (a(d) < nearness) return false;                                        // Points too close relative to intersection
       final float l = (x*𝕪 - y*𝕩) / d;                                          // Fraction to intersection
       p.set(x11 + l*𝘅, y11 + l*𝘆);                                              // Load result
       return true;                                                              // Result is valid
      }
-    Float pointToLine(float x, float y, float 𝘅, float 𝘆, float 𝕩, float 𝕪)     // Signed distance from point(x,y) to line through point(𝘅,𝘆) and point(𝕩,𝕪). The sign is positive when the point is to the right of the line when the observer stands at point(𝘅,𝘆) and looks at point(𝕩,𝕪)
-     {final float lx = 𝕩 - 𝘅, ly = 𝕪 - 𝘆, d = d(lx, ly);                        // Vector along line, length of vector
-      if (d < 1e-6) return null;                                                // Complain if line is not well  defined - a fraction less than 1 is adequate as we measure in pixels
-      return (-ly*x + ly*𝘅 + lx*y - lx*𝘆) / d;                                  // Signed distance from line
+    Float pointToLine(final float x, final float y,                             // Signed distance from point(x,y) to line through point(𝘅,𝘆) and point(𝕩,𝕪). The sign is positive when the point is to the right of the line when the observer stands at point(𝘅,𝘆) and looks at point(𝕩,𝕪)
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {final float X = 𝕩 - 𝘅, Y = 𝕪 - 𝘆, d = d(X, Y);                            // Vector along line, length of vector
+      if (d < nearness) return null;                                            // Complain if line is not well  defined - a fraction less than 1 is adequate as we measure in pixels
+      return (Y*(𝘅-x) + X*(y-𝘆)) / d;                                           // Signed distance from line
      }
-    boolean pointToLine(PointF 𝗽, float x, float y,                             // Sets vector(p) to point from the point(x,y) to the nearest point on the line through point(𝘅,𝘆) and point(𝕩,𝕪)
-      float 𝘅, float 𝘆, float 𝕩, float 𝕪)
-     {final float lx = 𝕩 - 𝘅, ly = 𝕪 - 𝘆, d = d(lx, ly);                        // Vector along line, length of vector
-      if (d < 1e-6) return false;                                               // Complain if line is not well  defined - a fraction less than 1 is adequate as we measure in pixels
-      final float 𝗱 = (-ly*x + ly*𝘅 + lx*y - lx*𝘆) / (d*d);                     // Signed fraction of line segment length giving distance from line to point
-      𝗽.x = ly*𝗱; 𝗽.y = -lx*𝗱;                                                  // Vector from point to nearest point on the defined line
+    boolean pointToLine(final PointF 𝗽, final float x, final float y,           // Sets point(𝗽) to the vector from point(x,y) to the nearest point on the line through point(𝘅,𝘆) and point(𝕩,𝕪)
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {final float X = 𝕩 - 𝘅, Y = 𝕪 - 𝘆, d = d(X, Y);                            // Vector along line, length of vector
+      if (d < nearness) return false;                                           // Complain if line is not well  defined - a fraction less than 1 is adequate as we measure in pixels
+      final float 𝗱 = (Y*(𝘅-x) + X*(y-𝘆)) / (d*d);                              // Signed fraction of line segment length giving distance from line to point
+      𝗽.x = Y*𝗱; 𝗽.y = -X*𝗱;                                                    // Vector from point to nearest point on the defined line
       return true;                                                              // Result is valid
      }
-    boolean inside(float X, float Y, float x, float y,                          // Test whether point(X,Y) is inside the triangle formed by points: (x,y), (𝘅, 𝘆), (𝕩, 𝕪)
-                   float 𝘅, float 𝘆, float 𝕩, float 𝕪)
-     {final Float a = pointToLine(X, Y, x, y, 𝘅, 𝘆);                            // Direction of point from each line
-      final Float b = pointToLine(X, Y, 𝘅, 𝘆, 𝕩, 𝕪);
-      final Float c = pointToLine(X, Y, 𝕩, 𝕪, x, y);
-      if (a == null || b == null || c == null) return false;
-      return (a > 0 && b > 0 && c > 0) || (a < 0 && b < 0 && c < 0);            // Directions must all be the same to be inside
+    boolean pointOnLine(final PointF 𝗽, final float x, final float y,           // Sets point(𝗽) to the closest position to point(x,y) on the line through point(𝘅,𝘆) and point(𝕩,𝕪)
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {if (pointToLine(𝗽, x, y, 𝘅, 𝘆, 𝕩, 𝕪))                                     // Vector to line
+       {𝗽.x += x; 𝗽.y += y;                                                     // Position on line
+        return true;                                                            // Result is valid
+       }
+      return false;                                                              // Result is not valid
+     }
+    boolean inside(final float X, final float Y, final float x, final float y,  // Test whether point(X,Y) is inside the triangle formed by points: (x,y), (𝘅, 𝘆), (𝕩, 𝕪), with tests to try to detect outside as quickly as possible
+                   final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {final boolean n = false;                                                  // Shorten value
+      final Float a = pointToLine(X, Y, x, y, 𝘅, 𝘆); if (a==null) return n;     // Direction of point from each line
+      final Float b = pointToLine(X, Y, 𝘅, 𝘆, 𝕩, 𝕪); if (b==null) return n;
+                                                     if (a*b < 0) return n;     // Different signs means different sides
+      final Float c = pointToLine(X, Y, 𝕩, 𝕪, x, y); if (c==null) return n;
+      return b*c > 0;                                                           // Different signs means different sides - transitively due to test above
      }
     float angle(float x, float y, float 𝘅, float 𝘆)                             // Angle of line to point(x,y) from point(𝘅,𝘆) measured in degrees clockwise from the x axis returned as a result in the range 0 to 360
      {return nd(at(x - 𝘅, y - 𝘆));
      }
     float angle(float x, float y, float 𝘅, float 𝘆, float 𝕩, float 𝕪)           // Angle of line from point(𝕩,𝕪) through point(𝘅,𝘆) to point(x,y) measured in degrees clockwise from the x axis returned as a result in the range 0 to 360
      {return nd(at(𝕩 - 𝘅, 𝕪 - 𝘆) - at(x - 𝘅, y - 𝘆));
+     }
+    int nearestVertex(final float X, final float Y,                             // Find the index of the vertex(0,1,2) of the vertex that  point(X,Y) is nearest too
+      final float x, final float y,
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {final float d = d(X, Y, x, y), 𝗱 = d(X, Y, 𝘅, 𝘆), 𝕕 = d(X, Y, 𝕩, 𝕪);      // Distances
+      return d <= 𝗱 & d < 𝕕 ? 0 : 𝗱 <= d & 𝗱 < 𝕕 ? 1 : 2;                       // Index of closest vertex ignoring the complicated problems of equidistant vertices
+     }
+    float heightAndPositionOfAltitude(final PointF 𝗽,                           // Return height of altitude and set 𝗽 to foot of altitude of a triangle with a side from point(x,y) to point(𝘅,𝘆) and angle(a) at point(x,y) and 𝗮 at point(𝘅,𝘆)
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Line segment of base of triangle
+      final float a, final float 𝗮)                                             // Angles at each end - no checks for bad angles like 0 or 90
+     {final float 𝕩 = 𝘅-x, 𝕪 = 𝘆-y, d = d(𝕩, 𝕪), A = td(a), 𝗔 = td(𝗮),          // Vector between vertices, distance between vertices
+        h = d * A * 𝗔 / (A + 𝗔), w = h / A;
+      𝗽.x = x + w/d * 𝕩;                                                        // Position of foot of altitude
+      𝗽.y = y + w/d * 𝕪;
+      return h;                                                                 // Height of altitude
+     }
+    float opposite(float x, float 𝘅) {return 2*x - 𝘅;}                          // Return 𝘅 reflected in x
+    void opposite(final PointF p, final PointF m, final PointF r)               // Reflect point(p) through point(m) to set point(r)
+     {opposite(p.x, p.y, m, r);
+     }
+    void opposite(float x, float y, final PointF m, final PointF r)             // Reflect point(x,y) through point(m) to set point(r)
+     {r.x = opposite(m.x, x);
+      r.y = opposite(m.y, y);
      }
    } // DisplayDrawing
 //------------------------------------------------------------------------------
@@ -1197,10 +1485,9 @@ number of vertices in each layer for each item.
     Drawing loadDrawing()                                                       // Load the drawing
      {final float f = f((t() - startTime) % period) / period;                   // Fraction of rotation
       return new Drawing()                                                      // Create the drawing
-      {{new Rectangle (){{n = "R1"; x = w/4; y =   h/4; r = 0.2f*w; R = 0.2f*h; /*a = 360*f*/; c1 = 𝝺sc; c2 = 𝝺sg;}};
-//      new Rectangle (){{n = "R2"; x = w/2; y = 3*h/4; r = 0.4f*w; R = 0.2f*h; /*a = 360*f*/; c1 = 𝝺sc; c2 = 𝝺sg;}};
-        createMirror(1);                                                        // Mirror - x axis
-        createMirror(2);                                                        // Mirror - y axis
+      {{new Rectangle (){{n="R1"; x=w/4; y=h/4; r=0.2f*w; R=0.2f*h; c1=𝝺sc; c2=𝝺sg;}};
+        createMirror(𝞈1, 1, cx, cy,  0, true,true,true,false);                  // Mirrors that do not reflect each other
+        createMirror(𝞈2, 2, cx, cy, 90, true,true,true,false);
         offerToRotateTracing();                                                 // Offer to rotate tracing
       }};
      }
@@ -1217,6 +1504,17 @@ number of vertices in each layer for each item.
        }};
      }
    } // DrawTriangle
+//------------------------------------------------------------------------------
+// 𝕯raw a test circle
+//------------------------------------------------------------------------------
+  class DrawCircle extends DisplayDrawing
+   {DrawCircle(final Activity Activity) {super(Activity.this);}
+    Drawing loadDrawing()
+     {return new Drawing()
+       {{new Circle() {{n = "C"; R=baseRadius(); c1 = 𝝺sb; c2 = 𝝺sc;}};
+       }};
+     }
+   } // DrawCircle
 //------------------------------------------------------------------------------
 // 𝕯raw a test tab
 //------------------------------------------------------------------------------
@@ -1240,7 +1538,7 @@ number of vertices in each layer for each item.
      }
    } // DrawPolyArea
 //------------------------------------------------------------------------------
-// Animated drawing
+// 𝕬nimated drawing
 //------------------------------------------------------------------------------
   abstract class AnimatedDrawing extends DisplayDrawing
    {final 𝝮 fore = new 𝝮("fore"), back = new 𝝮("back"), back2 = new 𝝮("back2"); // Effect of dragging
@@ -1251,7 +1549,7 @@ number of vertices in each layer for each item.
 
     void pointerPressed() {fore.speed = 0;}                                     // Pointer pressed stops rotation of upper items
 
-    @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) {} // Recentre on change of orientation
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {}           // Recentre on change of orientation
 
     float friction    (final float speed) {return -speed;}                      // Friction
     float acceleration(final float angle) {return angle/2;}                     // Acceleration towards target
@@ -1296,7 +1594,7 @@ number of vertices in each layer for each item.
      }
    } // TwoSemiCirclesMakeACircle
 //------------------------------------------------------------------------------
-// Reflect a line in a mirror to make a snowflake when the original, the mirror
+// 𝕽eflect a line in a mirror to make a snowflake when the original, the mirror
 // and the reflection form a hexagon. Show right angles when the original and
 // the reflection are collinear.
 //------------------------------------------------------------------------------
@@ -1428,7 +1726,7 @@ number of vertices in each layer for each item.
     int mirrorsRequired() {return mirrorsBoth;}                                 // Set mirrors
    } // TangentToDiameterMirrored
 //------------------------------------------------------------------------------
-// Two equilateral triangles reflected in two mirrors make a hexagon
+// 𝕿wo equilateral triangles reflected in two mirrors make a hexagon
 //------------------------------------------------------------------------------
   class TwoEquilateralTrianglesReflectedInTwoMirrorsMakeAHexagon
     extends AnimatedDrawing
@@ -1534,7 +1832,7 @@ number of vertices in each layer for each item.
      }
    } // Pentagon
 //------------------------------------------------------------------------------
-// Reflected diameter
+// 𝕽eflected diameter
 //------------------------------------------------------------------------------
   class ReflectedDiameter extends DisplayDrawing
    {ReflectedDiameter(final Activity Activity) {super(Activity.this);}          // Create display
@@ -1557,7 +1855,7 @@ number of vertices in each layer for each item.
     int overlayRequired() {return -1;}                                          // Choose which overlay is required
    } // ReflectedDiameter
 //------------------------------------------------------------------------------
-// Isosceles Triangle
+// ℑsosceles Triangle
 //------------------------------------------------------------------------------
   class IsoscelesTriangle extends DisplayDrawing
    {IsoscelesTriangle(final Activity Activity) {super(Activity.this);}          // Create display
@@ -1597,8 +1895,9 @@ number of vertices in each layer for each item.
      }
    } // IsoscelesTriangle
 //------------------------------------------------------------------------------
-// Half Angle
+// 𝕳alf Angle
 //------------------------------------------------------------------------------
+// Possibly use reflect=trace=false to reduce the complexity of this drawing
   class HalfAngle extends DisplayDrawing
    {HalfAngle(final Activity Activity) {super(Activity.this);}                  // Create display
 
@@ -1638,7 +1937,7 @@ number of vertices in each layer for each item.
     int mirrorsRequired() {return mirrorsBoth;}                                 // Set mirrors
    } // HalfAngle
 //------------------------------------------------------------------------------
-// Arrow head
+// 𝕬rrow head
 //------------------------------------------------------------------------------
   class ArrowHead extends DisplayDrawing
    {ArrowHead(final Activity Activity)                                          // Create display
@@ -1693,7 +1992,7 @@ number of vertices in each layer for each item.
     int mirrorsRequired() {return mirrorsBoth;}                                 // Set mirrors
    } // ArrowHead
 //------------------------------------------------------------------------------
-// Tick - arrow head off to the side
+// 𝕿ick - arrow head off to the side
 //------------------------------------------------------------------------------
   class Tick extends DisplayDrawing
    {Tick(final Activity Activity)                                               // Create display
@@ -1752,7 +2051,7 @@ number of vertices in each layer for each item.
     int mirrorsRequired() {return mirrorsBoth;}                                 // Set mirrors
    } // Tick
 //------------------------------------------------------------------------------
-// Parallel lines preserve angles
+// 𝕻arallel lines preserve angles
 //------------------------------------------------------------------------------
   class ParallelLinesPreserveAngles extends DisplayDrawing
    {ParallelLinesPreserveAngles(final Activity Activity) {super(Activity.this);}// Create display
@@ -1791,7 +2090,7 @@ number of vertices in each layer for each item.
      }
    } // ParallelLinesPreserveAngles
 //------------------------------------------------------------------------------
-// Interior Angles of a Triangle make a Line
+// ℑnterior angles of a triangle make a line
 //------------------------------------------------------------------------------
   class InteriorAnglesOfATriangleMakeALine extends DisplayDrawing
    {InteriorAnglesOfATriangleMakeALine(final Activity Activity)                 // Create display
@@ -1857,7 +2156,7 @@ number of vertices in each layer for each item.
     boolean drawAngles() {return false;}                                        // Draw angles else draw areas
    } // InteriorAnglesOfATriangleMakeALine
 //------------------------------------------------------------------------------
-// The Theorem of Pythagoras - see tests/Pythagoras.dxf
+// 𝕿he Theorem of Pythagoras - see tests/Pythagoras.dxf
 //------------------------------------------------------------------------------
   class Pythagoras extends DisplayDrawing
    {final int N = 4;                                                            // Number of right angle triangles
@@ -1971,7 +2270,103 @@ number of vertices in each layer for each item.
      }
    } // Pythagoras
 //------------------------------------------------------------------------------
-// The Schwartz inequality - a line is the shortest path between two points
+// 𝕾quaring a rectangle by applying the Theorem of Pythagoras
+//------------------------------------------------------------------------------
+  class SquaringARectangle extends DisplayDrawing
+   {final float fs = 0.20f;                                                     // Initial fractional shortest side of rectangle
+    SquaringARectangle(final Activity Activity) {super(Activity.this);}         // Create display
+    Drawing loadDrawing()                                                       // Load the drawing
+     {final float 𝗿 = baseRadius(), 𝗱 = 2 * 𝗿,                                  // Dimension of outer square
+        𝗮 = r(0, 𝗱, (1f-fs)*𝗱 +                                                 // Constrained drag of inner rectangle dimensions
+          -𝞈1.aldy+𝞈3.aldy-𝞈2.aldx+𝞈4.aldx
+          -𝞈1.aldx+𝞈3.aldx+𝞈2.aldy-𝞈4.aldy),
+        𝗯 = 𝗱-𝗮,
+        𝝰 = a(𝗮-𝗯)/2, 𝝱 = os(𝝰, 𝗿),                                             // Location of radius through vertical side of the inner square or its extension
+        x1 = cx+𝗿, y1 = cy-𝗿, 𝘅1 = x1-𝗯, 𝘆1 = y1+𝗯,                             // Corners of outer square and inner square
+        x2 = cx-𝗿, y2 = cy-𝗿, 𝘅2 = x2+𝗯, 𝘆2 = y2+𝗯,
+        x3 = cx-𝗿, y3 = cy+𝗿, 𝘅3 = x3+𝗯, 𝘆3 = y3-𝗯,
+        x4 = cx+𝗿, y4 = cy+𝗿, 𝘅4 = x4-𝗯, 𝘆4 = y4-𝗯,
+        X  = cx-𝝰, Y  = cy-𝝱, 𝗫 = cx+𝝰, 𝗬 = cy+𝝱;                               // Diameter coordinates
+
+      return new Drawing()                                                      // Create the drawing
+       { {new PolyArea(x1,y1, 𝘅2,y1, 𝘅2,𝘆2, x1,𝘆1){{n="D1"; 𝞈=𝞈1; c1=𝝺sV; c2=𝝺sg;}}; // Sides of inner square
+          new PolyArea(x2,y2, x2,𝘆3, 𝘅3,𝘆3, 𝘅2,y2){{n="D2"; 𝞈=𝞈2; c1=𝝺sb; c2=𝝺sc;}}; // in anti clock wise order
+          new PolyArea(x3,y3, 𝘅4,y3, 𝘅4,𝘆4, x3,𝘆3){{n="D3"; 𝞈=𝞈3; c1=𝝺sg; c2=𝝺sb;}}; // from upper right
+          new PolyArea(x4,y4, x4,𝘆1, 𝘅1,𝘆1, 𝘅4,y4){{n="D4"; 𝞈=𝞈4; c1=𝝺sc; c2=𝝺sV;}}; // corner
+         }
+        void overlay()
+         {final float t = innerThickness(), 𝘁 = 2 * t;                          // Thickness of overlay lines
+          setPaint(𝝺o, t); canvas.drawRect(x1,y1, x3,y3, paint);                // Outer square
+          setPaint(𝝺r, t); canvas.drawRect(𝘅1,𝘆1, 𝘅3,𝘆3, paint);                // Outer square
+          setPaint(𝝺y, t); canvas.drawCircle(cx, cy, 𝗿, paint);                 // Circle
+          setPaint(𝝺y, 𝘁); canvas.drawLine(X,Y, 𝗫,𝗬, paint);                    // Diameter
+          setPaint(𝝺r, 𝘁); canvas.drawLine(X,𝗬, 𝗫,𝗬, paint);                    // Side of central square
+          setPaint(𝝺g, 𝘁); canvas.drawLine(X,Y, X,𝗬, paint);                    // Side of square with same area as 4 rectangles = outer square - inner square
+         }
+        void pointerReleased()
+         {final float c = 2*outerThickness();                                   // Closeness
+          final boolean                                                         // Close to things
+            line = a(𝗮) < c || a(𝗯) < c, square = a(𝗮-𝗯) < c, half = a(𝝰-𝝱) < c;
+// Upgrade to Goal
+//          if      (square) achieved(SquaringARectangle.this, "Square");       // Achieved
+//          else if (line)   achieved(SquaringARectangle.this, "Line");
+//          else if (half)   achieved(SquaringARectangle.this, "Half");
+          if      (line)   zero(0);                                             // Improve: reset if rectangle is close to being a line
+          else if (half)   zero((𝗱-(𝗱-𝗱/sq(2))/2)-fs*𝗱);                        // Improve to half
+          else if (square) zero(𝗱/2-fs*𝗱);                                      // Improve to square
+         }
+        void zero(final float d)                                                // Reset drag
+         {𝞈1.aldx = d;
+          𝞈1.aldy=𝞈2.aldx=𝞈2.aldy=𝞈3.aldx=𝞈3.aldy=𝞈4.aldx=𝞈4.aldy=0;
+         }
+       };
+     }
+   } // SquaringARectangle
+//------------------------------------------------------------------------------
+// 𝕮ompare the length of the left diameter with the length of the right diameter
+// to demonstrate that lengths can be compared at a distance
+//------------------------------------------------------------------------------
+  class ComparingLengths extends DisplayDrawing
+   {final float r1 = 0.7f, r2 = 0.8f;                                           // Initial fractional length of diameters vs height of screen
+    ComparingLengths(final Activity Activity) {super(Activity.this);}           // Create display
+    Drawing loadDrawing()                                                       // Load the drawing
+     {final float 𝗿 = baseRadius(), 𝗱 = 2*𝗿,                                    // Circle dimensions
+        x1 = cx-𝗿, y1 = cy, x2 = cx+𝗿, y2 = cy,                                 // Positions of centres of circles
+        𝗿1 = r(2*outerThickness(), 𝗱, 𝗿*r1+𝞈1.radial),                          // Left radius
+        𝗿2 = r(2*outerThickness(), 𝗱, 𝗿*r2+𝞈2.radial);                          // Right radius
+      return new Drawing()                                                      // Create the drawing
+       {final float a1, a2, 𝗮, dx, dy, 𝘅1, 𝘆1, 𝘅2, 𝘆2;                          // Angles of each diameter, angles of reflection of left diameter, vector along left diameter, coordinates of each end reflected in the first mirror
+         {createMirror(null, 1, cx, cy, 90, false, true, false, false);         // Fixed mirror through centre
+          a1=a1(); a2=a2(); dx=𝗿1*cd(a1); dy=𝗿1*sd(a1);                         // Diameter angles, vector along the left diameter
+          mirror1.reflectInMirror(x1+dx, y1+dy);                                // Reflect position of centre of left diameter
+          𝘅1 = mirror1.𝖃; 𝘆1 = mirror1.𝖄;                                       // Reflected position of centre of left diameter
+          mirror1.reflectInMirror(x1-dx, y1-dy);                                // Reflect position of other end of the left diameter
+          𝘅2 = mirror1.𝖃; 𝘆2 = mirror1.𝖄;                                       // Reflected position of other point along the left diameter
+          𝗮 = angle(𝘅1, 𝘆1, 𝘅2, 𝘆2);                                            // Angle of reflected left diameter - now on the right
+          createMirror(𝞈3, 2, x2, y2, (𝗮+a2)/2, true, false, true, false);      // Moveable mirror through right intersection angled to reflect the reflection of the left diameter onto the right diameter so their lengths can be compared
+          new Diameter() {{n="c1"; 𝕩=x=x1; 𝕪=y=y1; r=𝗿1; a=a1; 𝞈=𝞈1; c1=𝝺w; c2=𝝺w; C=𝝺y;}}; // Left diameter
+          new Diameter() {{n="c2"; 𝕩=x=x2; 𝕪=y=y2; r=𝗿2; a=a2; 𝞈=𝞈2; c1=𝝺sr;c2=𝝺ss;C=𝝺w;}}; // Right diameter with which the left diameter will be compared
+         }
+        float a1() {return 𝞈1.angle-90;}                                        // Angle of left diameter
+        float a2() {return 𝞈2.angle-60;}                                        // Angle of right diameter
+        void overlay()
+         {final float 𝕩1, 𝕪1, 𝕩2, 𝕪2;                                           // Coordinates of left diameter reflected in first mirror and then again in the second mirror
+          mirror2.reflectInMirror(𝘅1, 𝘆1);
+          𝕩1 = mirror2.𝖃; 𝕪1 = mirror2.𝖄;                                       // One end
+          mirror2.reflectInMirror(𝘅2, 𝘆2);
+          𝕩2 = mirror2.𝖃; 𝕪2 = mirror2.𝖄;                                       // Other end
+          setPaint(𝝺y); canvas.drawLine(𝕩1, 𝕪1, 𝕩2, 𝕪2, paint);                 // Line joining ends of doubly reflected left diameter
+          setPaint(𝝺y); canvas.drawLine(x1-dx, y1-dy, x1+dx, y1+dy, paint);     // Original
+         }
+        void pointerReleased()
+         {if (a(𝗿2-𝗿1) < outerThickness()) 𝞈1.radial += 𝗿2 - 𝗿1;                // Improve length if possible
+         }
+       };
+     }
+    int mirrorsRequired() {return mirrorsBoth;}                                 // Set mirrors
+   } // ComparingLengths
+//------------------------------------------------------------------------------
+// 𝕿he Schwartz inequality - a line is the shortest path between two points
 //------------------------------------------------------------------------------
   class SchwartzInequality extends DisplayDrawing
    {SchwartzInequality(final Activity Activity) {super(Activity.this);}         // Create display
@@ -1996,7 +2391,7 @@ number of vertices in each layer for each item.
      }
    } // SchwartzInequality
 //------------------------------------------------------------------------------
-// Congruent triangles
+// 𝕮ongruent triangles
 //------------------------------------------------------------------------------
   class CongruentTriangles extends DisplayDrawing
    {CongruentTriangles(final Activity Activity)                                 // Create display
@@ -2042,13 +2437,14 @@ number of vertices in each layer for each item.
    {CongruentScaleneTriangles(final Activity Activity) {super(Activity);}
    } // CongruentScaleneTriangles
 //------------------------------------------------------------------------------
-// Draggable triangle: basis for drawings of triangles
+// 𝕯raggable triangle: basis for drawings of triangles
 //------------------------------------------------------------------------------
   class DraggableTriangle extends DisplayDrawing
-   {final PointF 𝗽 = new PointF();                                              // Intersection point
-    float fx1() {return -0.45f;} float fy1() {return fx1();}                    // Fractional offset off initial position from centre
-    float fx2() {return -fx1();} float fy2() {return 0;}
-    float fx3() {return  fx1();} float fy3() {return -fy1();}
+   {final PointF 𝗽 = new PointF(), 𝗾 = new PointF(),                            // Intersection points
+      c = new PointF(), 𝗰 = new PointF(), 𝕔 = new PointF();                     // Corner opposite shortest, longest, remaining side
+    float fx() {return -0.45f;} float fy() {return fx();}                       // Fractional offset off initial position from centre
+    float f𝘅() {return -fx();}  float f𝘆() {return 0;}
+    float f𝕩() {return  fx();}  float f𝕪() {return -fy();}
 
     int 𝝺t11() {return 𝝺sV;} int 𝝺t12() {return 𝝺ss;}                           // Angle colours
     int 𝝺t21() {return 𝝺sg;} int 𝝺t22() {return 𝝺sr;}
@@ -2058,13 +2454,45 @@ number of vertices in each layer for each item.
     int 𝝺d21() {return 𝝺sb;} int 𝝺d22() {return 𝝺sr;} int 𝝺d2() {return 𝝺w;}
     int 𝝺d31() {return 𝝺sg;} int 𝝺d32() {return 𝝺sb;} int 𝝺d3() {return 𝝺w;}
 
+    boolean writeAnglesInDegrees() {return true;}                               // Override to supress angles being show numerically in degrees
+
+    float dragTabsRadius() {return m(w,h)/4;}                                   // Radius of drag tabs
+
+    class ReferenceTriangle                                                     // Convenient Description of a triangle
+     {float a, 𝗮, 𝕒, x, y, 𝘅, 𝘆, 𝕩, 𝕪;
+      ReferenceTriangle() {}
+      ReferenceTriangle set(float A, float 𝗔, float 𝔸,
+        float X, float Y, float 𝗫, float 𝗬, float 𝕏, float 𝕐)
+       {a = A; 𝗮 = 𝗔; 𝕒 = 𝔸; x = X; y = Y; 𝘅 = 𝗫; 𝘆 = 𝗬; 𝕩 = 𝕏; 𝕪 = 𝕐;
+        return this;
+       }
+     }
+    final ReferenceTriangle 𝘁 = new ReferenceTriangle();                        // Description of current triangle
+
+    AngleGoal fixedAngleGoal(final double a, final double 𝗮, final String name) // Create a fixed angle goal
+     {return new AngleGoal(name)
+       {float A() {return (float)a;}
+        float 𝗔() {return (float)𝗮;}
+       };
+     }
+
+    final AngleGoal                                                             // Goals for the user
+      𝝲Equilateral         = fixedAngleGoal(60, 60, "Equilateral"),
+      𝝲EquilateralHalf     = fixedAngleGoal(30, 60, "EquilateralHalf"),
+      𝝲IsoscelesRightAngle = fixedAngleGoal(45, 45, "IsoscelesRightAngle"),
+      𝝲Line                = fixedAngleGoal( 0,  0, "Line"),
+      𝝲RightAngle          = new AngleGoal("RightAngle") {float A() {return ma();} float 𝗔() {return 90-ma();}},
+      𝝲Isosceles           = new AngleGoal("Isosceles")  {float A() {return ia();} float 𝗔() {return    𝗶a();}};
+
+    void setGoal() {setCurrentGoal(𝝲Isosceles);}                                // Override this goal as desired
+
     DraggableTriangle(final Activity Activity) {super(Activity.this);}          // Create display
     Drawing loadDrawing()                                                       // Load the drawing
      {final float
-        x1 = r(0, w, cx+fx1()*w+𝞈1.aldx),   y1 = r(0, h, cy+fy1()*h+𝞈1.aldy),   // Top left
-        x2 = r(0, w, cx+fx2()*w+𝞈2.aldx),   y2 = r(0, h, cy+fy2()*h+𝞈2.aldy),   // Middle right
-        x3 = r(0, w, cx+fx3()*w+𝞈3.aldx),   y3 = r(0, h, cy+fy3()*h+𝞈3.aldy),   // Bottom left
-        𝗥  = m(w,h)/4,                                                          // Radius of drag tabs
+        x1 = r(0, w, cx+fx()*w+𝞈1.aldx),   y1 = r(0, h, cy+fy()*h+𝞈1.aldy),     // Top left
+        x2 = r(0, w, cx+f𝘅()*w+𝞈2.aldx),   y2 = r(0, h, cy+f𝘆()*h+𝞈2.aldy),     // Middle right
+        x3 = r(0, w, cx+f𝕩()*w+𝞈3.aldx),   y3 = r(0, h, cy+f𝕪()*h+𝞈3.aldy),     // Bottom left
+        𝗥  = dragTabsRadius(),                                                  // Radius of drag tabs
         𝗮  = angle(x3, y3, x1, y1, x2, y2),  𝕒 = angle(x2, y2, x1, y1)-𝗮,       // Drag tabs, sweep angle, angular position
         𝗯  = angle(x1, y1, x2, y2, x3, y3),  𝕓 = angle(x3, y3, x2, y2)-𝗯,
         𝗰  = angle(x2, y2, x3, y3, x1, y1),  𝕔 = angle(x1, y1, x3, y3)-𝗰;
@@ -2079,177 +2507,679 @@ number of vertices in each layer for each item.
       else if (bc)             {C31 = C21; C32 = C22;}
       final int c11=C11, c12=C12, c21=C21, c22=C22, c31=C31, c32=C32;           // Initial angle colours
 
-      final float[]𝘁 = new float[]{𝗮, 𝗯, 𝗰, x1, y1, x2, y2, x3, y3};            // Parameter list to overrides
+      𝘁.set(𝗮, 𝗯, 𝗰, x1,y1, x2,y2, x3,y3);                                      // Parameter list to overrides in a compact form
       final 𝝮 𝞃 = translate() ? 𝞈Translation : null;                            // Allow translation or not
 
+      setGoal();                                                                // Set the goal for the user
+
       return new Drawing()                                                      // Create the drawing
-       { {underlayItems(this, 𝘁);                                               // Override to draw items under the triangle
-          new Diameter(){{n="d1"; c1=𝝺d11(); c2=𝝺d12(); C=𝝺d1(); 𝞈=𝞃; bp(x1, y1, x3, y3);}};   // Sides
-          new Diameter(){{n="d2"; c1=𝝺d21(); c2=𝝺d22(); C=𝝺d2(); 𝞈=𝞃; bp(x1, y1, x2, y2);}};
-          new Diameter(){{n="d3"; c1=𝝺d31(); c2=𝝺d32(); C=𝝺d3(); 𝞈=𝞃; bp(x2, y2, x3, y3);}};
-          new Tab     (){{n="t1"; c1=c11; c2=c12; 𝞈=𝞈1;x=x1;y=y1;A=𝗮;a=𝕒;R=𝗥; reflect=false;}};// Drag tabs
-          new Tab     (){{n="t2"; c1=c21; c2=c22; 𝞈=𝞈2;x=x2;y=y2;A=𝗯;a=𝕓;R=𝗥; reflect=false;}};
-          new Tab     (){{n="t3"; c1=c31; c2=c32; 𝞈=𝞈3;x=x3;y=y3;A=𝗰;a=𝕔;R=𝗥; reflect=false;}};
-          overlayItems(this, 𝘁);                                                // Override to draw items over the triangle
+       { {underlayItems(this);                                                  // Override to draw items under the triangle
+          new Tab     (){{n="t1"; c1=c11; c2=c12; 𝞈=𝞈1;x=x1;y=y1;A=𝗮;a=𝕒;R=𝗥; reflect=false; trace=false;}}; // Drag tabs
+          new Tab     (){{n="t2"; c1=c21; c2=c22; 𝞈=𝞈2;x=x2;y=y2;A=𝗯;a=𝕓;R=𝗥; reflect=false; trace=false;}}; // Turning off tracing makes it easier to see what is happening when dragging but as a consequence one cannot offer to rotate the items in the drawing.
+          new Tab     (){{n="t3"; c1=c31; c2=c32; 𝞈=𝞈3;x=x3;y=y3;A=𝗰;a=𝕔;R=𝗥; reflect=false; trace=false;}};
+          new Diameter(){{n="d1"; c1=𝝺d11(); c2=𝝺d12(); C=𝝺d1(); 𝞈=𝞃; bp(x1, y1, x3, y3);    trace=false;}};    // Sides
+          new Diameter(){{n="d2"; c1=𝝺d21(); c2=𝝺d22(); C=𝝺d2(); 𝞈=𝞃; bp(x1, y1, x2, y2);    trace=false;}};    // Turning off tracing makes it easier to see what is happening when dragging
+          new Diameter(){{n="d3"; c1=𝝺d31(); c2=𝝺d32(); C=𝝺d3(); 𝞈=𝞃; bp(x2, y2, x3, y3);    trace=false;}};
+          overlayItems(this);                                                   // Override to draw items over the triangle
+          if (writeAnglesInDegrees())                                           // Write angles if requested
+           {writeAngles(x1, y1, x2, y2, x3, y3,
+            c12, irnd(nt(𝗮)), c22, irnd(nt(𝗯)), c32);
+           }
          }
-        void underlay       () {underlay       (𝘁);}                            // Call to overridable underlay() method
-        void overlay        () {overlay        (𝘁);}                            // Call to overridable overlay() method
-        void pointerReleased() {pointerReleased(𝘁);}                            // Call to overridable pointerReleased() method
+        void underlay       () {drawUnderlay  ();}                              // Call to overridable underlay() method
+        void overlay        () {drawOverlay   ();}                              // Call to overridable overlay() method
+        void pointerPressed () {pointerPressed();}                              // Call to overridable pointerPressed() method
+        void pointerDragged () {pointerDragged();}                              // Call to overridable pointerDragged() method
+        void pointerReleased() {pointerReleased();}                             // Call to overridable pointerReleased() method
        };
      }
-    void underlay                (final float[]𝘁) {}                            // Underlay drawing
-    void overlay                 (final float[]𝘁) {}                            // Overlay drawing
-    void pointerReleased         (final float[]𝘁) {improve(𝘁);}                 // Pointer released - make isosceles or equilateral if close to same
-    void underlayItems(Drawing 𝗱, final float[]𝘁) {}                            // Override to add additional items to be drawn under the triangle
-    void overlayItems (Drawing 𝗱, final float[]𝘁) {}                            // Override to add additional items to be drawn on top of the triangle
+    void drawUnderlay          () {}                                            // Underlay drawing
+    void drawOverlay           () {}                                            // Overlay drawing
+    void pointerPressed        () {}                                            // Pointer pressed
+    void pointerDragged        () {}                                            // Pointer dragged
+    void pointerReleased       () {}                                            // Pointer released
+    void underlayItems(Drawing 𝗱) {}                                            // Override to add additional items to be drawn under the triangle
+    void overlayItems (Drawing 𝗱) {}                                            // Override to add additional items to be drawn on top of the triangle
     boolean translate() {return false;}                                         // Allow translation
-    boolean improve(final float[]𝘁)                                             // Make equilateral, right angles or isosceles if close to same
-     {final float 𝗮=𝘁[0], 𝗯=𝘁[1], 𝗰=𝘁[2],
-        x1=𝘁[3], y1=𝘁[4], x2=𝘁[5], y2=𝘁[6], x3=𝘁[7], y3=𝘁[8];
-      if      (isEqui(𝗯, 𝗰, x2,y2, x3,y3))        i1();                         // Move to improve equilateral triangle
-      else if (isEqui(𝗮, 𝗰, x3,y3, x1,y1))        i2();
-      else if (isEqui(𝗮, 𝗯, x1,y1, x2,y2))        i3();
-      else if (isRIso(𝗯, 𝗰, x2,y2, x3,y3))        i1();                         // Move to improve right angle triangle - isosceles
-      else if (isRIso(𝗮, 𝗰, x3,y3, x1,y1))        i2();
-      else if (isRIso(𝗮, 𝗯, x1,y1, x2,y2))        i3();
-      else if (isRA  (𝗯, x1,y1, x2,y2, x3,y3))    i1();                         // Move to improve right angle triangle - half isosceles
-      else if (isRA  (𝗰, x2,y2, x3,y3, x1,y1))    i2();
-      else if (isRA  (𝗮, x3,y3, x1,y1, x2,y2))    i3();
-      else if (isIso (𝗯, 𝗰, x1,y1, x2,y2, x3,y3)) i1();                         // Move to improve isosceles triangle
-      else if (isIso (𝗮, 𝗰, x2,y2, x3,y3, x1,y1)) i2();
-      else if (isIso (𝗮, 𝗯, x3,y3, x1,y1, x2,y2)) i3();
-      else return false;                                                        // Unimproved
-      return true;                                                              // Improved
+    void i1(PointF 𝗽) {𝞈1.aldx = 𝗽.x-cx - fx()*w; 𝞈1.aldy = 𝗽.y-cy - fy()*h;}   // Improve corner 1
+    void i2(PointF 𝗽) {𝞈2.aldx = 𝗽.x-cx - f𝘅()*w; 𝞈2.aldy = 𝗽.y-cy - f𝘆()*h;}   // Improve corner 2
+    void i3(PointF 𝗽) {𝞈3.aldx = 𝗽.x-cx - f𝕩()*w; 𝞈3.aldy = 𝗽.y-cy - f𝕪()*h;}   // Improve corner 3
+    private void writeAngles                                                    // Write the angles, but only the different angles so that we avoid the problem of things adding up to 180
+     (float x1, float y1, float x2, float y2, float x3, float y3,
+      int   a,  int   𝗮,  int   b,  int   𝗯,  int  c)
+     {final int 𝗰 = 180 - 𝗮 - 𝗯;                                                // Make sure the angles add up to 180
+      final Paint p = paint;
+      final float 𝗵 = h/9f, 𝕙 = h/8f, l = w/3f, u = h/3f;                       // Text height, quadrants - with apologies to left handed people
+      final boolean
+        left = (x1 > l && x2 > l) || (x1 > l && x3 > l) || (x2 > l && x3 > l),  // Draw left
+        up   = (y1 > u && y2 > u) || (y1 > u && y3 > u) || (y2 > u && y3 > u);  // Draw upper
+      p.setTextSize(𝗵);
+      final float
+        𝘄 = p.measureText("000"),                                               // Width of largest number
+        𝘅 = left ? 𝘄 + w / 16f : 15f*w/16f,                                     // X of end of string
+        𝘆 = up ? h / 16f : 15f*h/16f - 3 * 𝕙;                                   // Y  of base
+      p.setStyle(Paint.Style.FILL);
+      p.setTextAlign(Paint.Align.RIGHT);                                        // Align numbers right
+      p.setPathEffect(null);                                                    // Make sure that no path effect is in effect
+      if      (a == b && b == c) w(a, b, c, 60, 60, 60,    𝘅, 𝘆, 𝕙);            // Make sure the numbers always add up to 180
+      else if (a == b)           w(a, b, c, 𝗮, 𝗮, 180-2*𝗮, 𝘅, 𝘆, 𝕙);
+      else if (a == c)           w(a, b, c, 𝗮, 180-2*𝗮, 𝗮, 𝘅, 𝘆, 𝕙);
+      else if (b == c)           w(a, b, c, 180-2*𝗯, 𝗯, 𝗯, 𝘅, 𝘆, 𝕙);
+      else                       w(a, b, c, 𝗮, 𝗯, 180-𝗮-𝗯, 𝘅, 𝘆, 𝕙);
+      p.setTextAlign(Paint.Align.LEFT);                                         // This paint is shared and this is the oinly method in which we touch the alignment so it is easiest to reset here
      }
-    boolean isEqui(float 𝗮, float 𝗯, float x2, float y2, float x3, float y3)    // If close enough to an equilateral triangle, then move to point(p) to improve it. Angles from base, line of base
-     {if (nearAngle(𝗮, 𝗯) > 1) return false;                                    // Not close enough
-      final boolean e1 = nearAngle(𝗮,60) < 1, e2 = nearAngle(𝗮,300) < 1;        // Possible equilateral triangle angles
-      if (!e1 && !e2) return false;                                             // Not close enough to equilateral triangle angles
-      final float a = (e1 ? +1: -1) * sq(3f)/2f;                                // Direction of apex from base
-      𝗽.x = (x2+x3)/2 + a*(y3-y2); 𝗽.y = (y2+y3)/2 - a*(x3-x2);                 // Desired position of apex of equilateral triangle
-      achieved(this, "Equilateral");                                            // Achieved equilateral triangle
-      return true;                                                              // Improved equilateral triangle
+    private void w                                                              // Write a set of angles
+     (int c, int 𝗰, int 𝕔, int a, int 𝗮, int 𝕒, float x, float y, float h)
+     {w(c, a, x, y, 1, h);
+      w(𝗰, 𝗮, x, y, 2, h);
+      w(𝕔, 𝕒, x, y, 3, h);
      }
-    boolean isRIso(float 𝗮, float 𝗯, float x2, float y2, float x3, float y3)    // If close enough to a right angle triangle, then move to point(p) to improve it. Angles from base, line of base
-     {if (nearAngle(𝗮, 𝗯) > 1) return false;                                    // Not close enough
-      final boolean e1 = nearAngle(𝗮,45) < 1, e2 = nearAngle(𝗮,315) < 1;        // Possible right angles triangles
-      if (!e1 && !e2) return false;                                             // Not close enough to right angle triangle angles
-      final float a = (e1 ? +1: -1) / 2f;                                       // Direction of apex from base
-      𝗽.x = (x2+x3)/2 + a*(y3-y2); 𝗽.y = (y2+y3)/2 - a*(x3-x2);                 // Desired position of apex of equilateral triangle
-      achieved(this, "IsoscelesRightAngle");                                    // Achieved isosceles right angle
-      return true;                                                              // Improved equilateral triangle
+    private int w(int colour, int a, float x, float y, int r, float h)          // Write an angle on a row
+     {paint.setColor(colour);
+      canvas.drawText(""+a+"°", x, y+r*h, paint);
+      return r+1;
      }
-    boolean isRA(float 𝗯,                                                       // If close enough to a right angle triangle, then move to point(p) to improve it. Angles from base, line of base
-      float x1, float y1, float x2, float y2, float x3, float y3)               // Corner being considered, corresponding opposite side
-     {if (nearAngle(𝗯, 90) > 1 && nearAngle(𝗯, 270) > 1) return false;          // Not close enough to right angle triangle angles
-      if (!pointToLine(𝗽, x1,y1, x2,y2, x3,y3)) return false;                   // Points to close to be useful
-      𝗽.x = x2-𝗽.x; 𝗽.y = y2-𝗽.y;                                               // Desired position of point
-      achieved(this, "RightAngle");                                             // Achieved right angle
-      return true;                                                              // Improved equilateral triangle
+    int irnd(float f) {return Math.round(nd(f));}                               // Round to nearest integer
+    void sortSides(final float x, final float y, final float 𝘅, final float 𝘆,  // Vertices of triangle which we want to sort by opposite side length, the sorted results are in PointF c, 𝗰, 𝕔 in ascending order of angle
+      final float 𝕩, final float 𝕪)
+     {final float d = d(𝕩-𝘅,𝕪-𝘆), 𝗱 = d(𝕩-x,𝕪-y), 𝕕 = d(𝘅-x,𝘆-y);               // Length of the sides
+      if      (d<=𝗱 && d<=𝕕)                                                    // Corner x,y is opposite shortest side
+       {c.x = x; c.y = y;
+        if (𝗱 > 𝕕) {𝕔.x = 𝘅; 𝕔.y = 𝘆; 𝗰.x = 𝕩; 𝗰.y = 𝕪;}                        // Side order is shortest x,y, longest=𝘅,𝘆, middle=𝕩,𝕪
+        else       {𝕔.x = 𝕩; 𝕔.y = 𝕪; 𝗰.x = 𝘅; 𝗰.y = 𝘆;}                        // Side order is shortest x,y, longest=𝕩,𝕪, middle=𝘅,𝘆,
+       }
+      else if (𝗱<=d && 𝗱<=𝕕)                                                    // Corner 𝘅,𝘆 is opposite shortest side
+       {c.x = 𝘅; c.y = 𝘆;
+        if (d > 𝕕) {𝕔.x = x; 𝕔.y = y; 𝗰.x = 𝕩; 𝗰.y = 𝕪;}                        // Side order is shortest 𝘅,𝘆, longest=x,y, middle=𝕩,𝕪
+        else       {𝕔.x = 𝕩; 𝕔.y = 𝕪; 𝗰.x = x; 𝗰.y = y;}                        // Side order is shortest 𝘅,𝘆, longest=𝕩,𝕪, middle=x,y,
+       }
+      else                                                                      // Corner 𝕩,𝕪 is opposite shortest side
+       {c.x = 𝕩; c.y = 𝕪;
+        if (d > 𝗱) {𝕔.x = x; 𝕔.y = y; 𝗰.x = 𝘅; 𝗰.y = 𝘆;}                        // Side order is shortest 𝕩,𝕪, longest=x,y, middle=𝘅,𝘆
+        else       {𝕔.x = 𝘅; 𝕔.y = 𝘆; 𝗰.x = x; 𝗰.y = y;}                        // Side order is shortest 𝕩,𝕪, longest=𝘅,𝘆, middle=x,y,
+       }
      }
-    boolean isIso(float 𝗮, float 𝗯,                                             // If close enough to an isosceles triangle, then move to point(p) to improve it
-      float x1, float y1, float x2, float y2, float x3, float y3)               // Corner being considered, corresponding opposite side
-     {if (nearAngle(𝗮, 𝗯) > 1) return false;                                    // Not close enough
-      if (!pointToLine(𝗽, x1,y1, x2,y2, x3,y3)) return false;                   // Try to improve an almost isosceles triangle Vector from apex to base
-      𝗽.x = (x2+x3)/2-𝗽.x; 𝗽.y = (y2+y3)/2-𝗽.y;                                 // Desired position of apex of isosceles triangle
-      achieved(this, "Isosceles");                                              // Achieved isosceles triangle
-      return true;                                                              // Improved isosceles triangle
-     }
-    void i1() {𝞈1.aldx = 𝗽.x-cx - fx1()*w; 𝞈1.aldy = 𝗽.y-cy - fy1()*h;}         // Improve corner 1
-    void i2() {𝞈2.aldx = 𝗽.x-cx - fx2()*w; 𝞈2.aldy = 𝗽.y-cy - fy2()*h;}         // Improve corner 2
-    void i3() {𝞈3.aldx = 𝗽.x-cx - fx3()*w; 𝞈3.aldy = 𝗽.y-cy - fy3()*h;}         // Improve corner 3
-   } // DraggableTriangle
-//------------------------------------------------------------------------------
-// Circle through three points
-//------------------------------------------------------------------------------
-// Add centre of normals though the angles
-  class Circle3Points extends DraggableTriangle
-   {final RectF s1 = new RectF(), s2 = new RectF(), s3 = new RectF();           // Angle bisectors
-    final RectF n1 = new RectF(), n2 = new RectF(), n3 = new RectF();           // Side normals
-    final PointF 𝗽 = new PointF();                                              // Intersection point
-    Circle3Points(final Activity Activity) {super(Activity.this);}              // Create display
+    abstract class AngleGoal extends Goal                                       // Triangle with specified angles
+     {abstract float A();                                                       // Angles associated with this goal after any modifications
+      abstract float 𝗔();
+      float aA, 𝗮A, 𝕒A, a𝗔, 𝗮𝗔, 𝕒𝗔, a𝔸, 𝗮𝔸, 𝕒𝔸;                                 // Each angle possibility in a match up
 
-    void overlay(final float[]𝘁)                                                // Overlay normal to each diameter
-     {final float 𝗮=𝘁[0],  𝗯=𝘁[1], 𝗰=𝘁[2],
-        x1=𝘁[3], y1=𝘁[4], x2=𝘁[5], y2=𝘁[6], x3=𝘁[7], y3=𝘁[8];
-      final int t = 20;                                                         // Thickness of line used to draw resulting circles
-      fSide (n1, x1,y1, x2,y2);                                                 // Find bisector of each side
-      fSide (n2, x2,y2, x3,y3);
-      fSide (n3, x3,y3, x1,y1);
-      fAngle(s1, x1,y1, x2,y2, x3,y3);                                          // Find bisector of each angle
-      fAngle(s2, x2,y2, x3,y3, x1,y1);
-      fAngle(s3, x3,y3, x1,y1, x2,y2);
-      final Canvas c = canvas; final Paint p = paint;                           // Shorten names
-      if (intersectionPoint(n1, n2))                                            // Draw exterior circle - centre will be at 𝗽
-       {final float r = d(𝗽.x - x1, 𝗽.y - y1);                                  // Radius of circle through corners
-        setPaint(𝝺y, t);                                                        // For bigCircle()
-        if (bigCircle(𝗮, r, x3,y3, x1,y1, x2,y2) ||                             // Big radius circle draw - skia graphics fail for large radii
-            bigCircle(𝗯, r, x1,y1, x2,y2, x3,y3) ||
-            bigCircle(𝗰, r, x2,y2, x3,y3, x1,y1)) {}
-        else                                                                    // Normal circle draw
-         {setPaint(𝝺y);    dSide(n1, r); dSide(n2, r); dSide(n3, r);
-          setPaint(𝝺y, t); c.drawCircle(𝗽.x, 𝗽.y, d(𝗽.x-x1, 𝗽.y-y1), p);
+      AngleGoal(final String Name) {super(Name);}                               // Name of the goal
+      private float equiAngle, smallestAngle;                                   // Equi angle and smallest angle of an isoceles triangle adjusted so that we can safely represent these angles as integers
+      float ma()                                                                // Minimum angle of the triangle
+       {final float r = m(nt(𝘁.a), m(nt(𝘁.𝗮), nt(𝘁.𝕒)));
+        return r;
+       }
+      private int apex(float a, float 𝗮, float 𝕒)                               // Find number of angle at apex of isosceles triangle else 0 if no angle is obviously the apex
+       {return nearAngle(a, 𝗮) < 1 ? 3 :
+               nearAngle(a, 𝕒) < 1 ? 2 :
+               nearAngle(𝗮, 𝕒) < 1 ? 1 : 0;
+       }
+      private int ma(float a, float 𝗮, float 𝕒)                                 // Find number of minimum angle
+       {return a <= 𝗮 && a <= 𝕒 ? 1 : 𝗮 <= a && 𝗮 <= 𝕒 ? 2 : 3;
+       }
+      private void 𝕚a()                                                         // Isoceles angles
+       {final float a = nt(𝘁.a), 𝗮 = nt(𝘁.𝗮), 𝕒 = nt(𝘁.𝕒);
+        final int m = ma(a, 𝗮, 𝕒), x = apex(a, 𝗮, 𝕒);                           // Minimum angle, apex angle numbers
+        final float i = irnd(m == 1 ? a : m == 2 ? 𝗮 : 𝕒);                      // Apex angle
+        if (m == x)                                                             // Apex angle is the minimum angle
+         {smallestAngle = i;                                                    // Apex angle
+          equiAngle = (180 - smallestAngle) / 2;                                // Equi-angle is largest
+         }
+        else smallestAngle = equiAngle = i;                                     // Smallest angle is an equi-angle
+       }
+      float ia() {𝕚a(); return smallestAngle;}                                  // Isoceles angle - smallest angle
+      float 𝗶a() {𝕚a(); return equiAngle;}                                      // Isoceles angle - equi-angle
+
+      void matchUpAngles()                                                      // See how well each pair of angle combinations matchs up
+       {final float
+          a = nt(𝘁.a), 𝗮 = nt(𝘁.𝗮), 𝕒 = nt(𝘁.𝕒),                                // Actual angles
+          A = A(), 𝗔 = 𝗔(), 𝔸 = 180 - A - 𝗔;                                    // Target Angles
+        aA = nearAngle(a, A);  𝗮A = nearAngle(𝗮, A); 𝕒A = nearAngle(𝕒, A);
+        a𝗔 = nearAngle(a, 𝗔); 𝗮𝗔 = nearAngle(𝗮, 𝗔); 𝕒𝗔 = nearAngle(𝕒, 𝗔);
+        a𝔸 = nearAngle(a, 𝔸); 𝗮𝔸 = nearAngle(𝗮, 𝔸); 𝕒𝔸 = nearAngle(𝕒, 𝔸);
+       }
+
+      boolean checkAchieved()                                                   // Nearness to a triangle specified by two of its angles which can be interior or exterior
+       {final float a = nt(𝘁.a), 𝗮 = nt(𝘁.𝗮), 𝕒 = nt(𝘁.𝕒),                      // Interior angles
+          x = 𝘁.x, y = 𝘁.y, 𝘅 = 𝘁.𝘅, 𝘆 = 𝘁.𝘆, 𝕩 = 𝘁.𝕩, 𝕪 = 𝘁.𝕪;
+        matchUpAngles();                                                        // Match up angles
+        final boolean r =                                                       // Did we achieve this goal
+         (aA < 1 && 𝗮𝗔 < 1) || (a𝗔 < 1 && 𝗮𝔸 < 1) || (a𝔸 < 1 && 𝗮A < 1) ||      // Go around one way to see if we can get a fit of two angles
+         (𝗮A < 1 && a𝗔 < 1) || (𝗮𝗔 < 1 && a𝔸 < 1) || (𝗮𝔸 < 1 && aA < 1);        // Or try the other way around
+        return r;
+       }
+
+      float howClose()                                                          // How close we are to the goal
+       {matchUpAngles();                                                        // Match up angles
+        final float[]C = new float[]                                            // Possible fits
+         {aA + 𝗮𝗔 + 𝕒𝔸, aA + 𝕒𝗔 + 𝗮𝔸,
+          𝗮A + a𝗔 + 𝕒𝔸, 𝗮A + 𝕒𝗔 + a𝔸,
+          𝕒A + a𝗔 + 𝗮𝔸, 𝕒A + 𝗮𝗔 + a𝔸};
+        float m = C[0];
+        for(float c: C) if (c < m) m = c;                                       // Find best fit
+        return m / 3;                                                           // Average closeness at best fit
+       }
+
+      void improveUserEffort()                                                  // Improve the triangle to match the goal exactly
+       {final float a = nt(𝘁.a), 𝗮 = nt(𝘁.𝗮), 𝕒 = nt(𝘁.𝕒),                      // Interior angles
+          x = 𝘁.x, y = 𝘁.y, 𝘅 = 𝘁.𝘅, 𝘆 = 𝘁.𝘆, 𝕩 = 𝘁.𝕩, 𝕪 = 𝘁.𝕪;
+        sortSides(x,y, 𝘅,𝘆, 𝕩,𝕪);                                               // Opposite shortest, longest, other
+        final float A = A(), 𝗔 = 𝗔();                                           // Target angles
+        final float 𝗵 = heightAndPositionOfAltitude(𝗽, c.x,c.y, 𝗰.x,𝗰.y, A,𝗔);  // Altitude on longest side, position of altitude
+        if (pointToLine(𝗾, 𝕔.x, 𝕔.y, c.x, c.y, 𝗰.x, 𝗰.y))                       // Sets point(𝗾) to the point closest to point(x,y) on the line through point(𝘅,𝘆) and point(𝕩,𝕪)
+         {final float d = 𝗾.length();                                           // Length of altitude to current apex
+          𝗽.x = 𝗽.x - 𝗵 * 𝗾.x / d; 𝗽.y = 𝗽.y - 𝗵 * 𝗾.y / d;                     // New position of apex scaled to the right length
+          final int i = nearestVertex(𝗽.x, 𝗽.y, x, y, 𝘅, 𝘆, 𝕩, 𝕪);              // Index of nearest vertex
+          if (i == 0) i1(𝗽); else if (i == 1) i2(𝗽); else i3(𝗽);                // Make current nearest apex the new apex
+          final float                                                           // How far out of the frame we are
+            X = 𝗽.x < 0 ? -𝗽.x : 𝗽.x > w ? w - 𝗽.x : 0,
+            Y = 𝗽.y < 0 ? -𝗽.y : 𝗽.y > h ? h - 𝗽.y : 0;
+          𝞈1.aldx += X; 𝞈1.aldy += Y;                                           // Adjust to bring back into frame if necessary
+          𝞈2.aldx += X; 𝞈2.aldy += Y;
+          𝞈3.aldx += X; 𝞈3.aldy += Y;
          }
        }
-      if (intersectionPoint(s1, s2))                                            // Draw interior circle
-       {setPaint(𝝺r);
-        dAngle(𝗽, x1,y1); dAngle(𝗽, x2,y2); dAngle(𝗽, x3,y3);
-        final Float d = pointToLine(𝗽.x, 𝗽.y, x1, y1, x2, y2);
-        setPaint(𝝺r, t); c.drawCircle(𝗽.x, 𝗽.y, d, p);
+     } // AngleGoal
+   } // DraggableTriangle
+//------------------------------------------------------------------------------
+// 𝕾ierpinski's triangular gasket - draggable slowly as the refresh rate is low!
+//------------------------------------------------------------------------------
+  class Sierpinski extends DraggableTriangle
+   {final int[]colour = new int[]
+     {𝝺y, 𝝺sb, 𝝺so, 𝝺sB,  𝝺sp, 𝝺sc, 𝝺sr, 𝝺sC,  𝝺ss, 𝝺sg, 𝝺sv, 𝝺sG,  𝝺sV};       // Colours for each level
+    float dragTabsRadius() {return m(cx, cy)*sq(3);}                            // Radius of drag tabs
+
+    Sierpinski(final Activity Activity) {super(Activity.this);}                 // Create display
+
+    void drawOverlay()                                                          // Overlay normal to each diameter
+     {triangle(8, 𝘁.x, 𝘁.y, 𝘁.𝘅, 𝘁.𝘆, 𝘁.𝕩, 𝘁.𝕪);
+     }
+    void triangle(final int depth, final float x1, final float y1,              // Depth to go, position of triangle to draw and sub divide
+      final float x2, final float y2, final float x3, final float y3)
+     {if (depth < 0) return;                                                    // Stop at some point
+      triangle(depth-1, x1,y1, (x1+x2)/2, (y1+y2)/2, (x1+x3)/2, (y1+y3)/2);     // Interior triangles
+      triangle(depth-1, x2,y2, (x1+x2)/2, (y1+y2)/2, (x2+x3)/2, (y2+y3)/2);
+      triangle(depth-1, x3,y3, (x1+x3)/2, (y1+y3)/2, (x2+x3)/2, (y2+y3)/2);
+      setPaint(colour[depth], 1);                                               // Set paint
+      canvas.drawLines(new float[]{x1,y1,x2,y2,x2,y2,x3,y3,x3,y3,x1,y1},paint); // Exterior triangle
+     }
+   } // Sierpinski
+//------------------------------------------------------------------------------
+// 𝕰uler's splendid line! https://en.wikipedia.org/wiki/Euler_line
+//------------------------------------------------------------------------------
+  class EulerLine extends DraggableTriangle
+   {EulerLine(final Activity Activity)                                          // Create display
+     {super(Activity.this);
+      overlayMirror = new Stack<Mirror>();                                      // Allocate mirrors for overlaid drawing
+     }
+    final RectF                                                                 // Preallocated lines
+      v2 = new RectF(), 𝘃2 = new RectF(),                                       // Angle bisectors - in-circle
+      s2 = new RectF(), 𝘀2 = new RectF(), 𝕤2 = new RectF(),                     // Side normals - circum-circle
+      a2 = new RectF(), 𝗮2 = new RectF(), 𝕒2 = new RectF(),                     // Altitudes: perpendicular from vertex to opposite side - orthocentre
+      c2 = new RectF(), 𝗰2 = new RectF(), 𝕔2 = new RectF();                     // Centroids: line from vertex to mid point of opposite side - centroid
+    final PointF                                                                // Preallocated important points - most found by findEulersLine()
+      𝗽 = new PointF(),                                                         // Intersection point
+      e = new PointF(),                                                         // Start  of Euler's line at circumcentre
+      𝗲 = new PointF(),                                                         // End of Euler's line at orthocentre
+      𝝼 = new PointF(),                                                         // Nine point centre
+      𝗸 = new PointF();                                                         // Centroid
+    Float er, 𝝼r;                                                               // Radius of circumcircle and radius of nine point circle - set by findEulersLine()
+    final float t = 4*innerThickness();                                         // Thickness of line used to draw resulting circles
+    final float dashWidth() {return 32f;}                                       // Dash width
+    final float  𝗱 = dashWidth();
+    final float[]𝕕 = new float[]{𝗱,𝗱};                                          // Dash details
+    final DashPathEffect
+      𝕕1 = new DashPathEffect(𝕕,0), 𝕕2 = new DashPathEffect(𝕕,  𝗱/2),           // Dash for lines and circles of overlay
+      𝕕3 = new DashPathEffect(𝕕,𝗱), 𝕕4 = new DashPathEffect(𝕕,3*𝗱/2),
+      𝕕InTriangle    = new DashPathEffect(new float[]{𝗱/2,𝗱/2}, 0),             // Dash pattern for inset quarter triangle
+      𝕕InCircle      = new DashPathEffect(new float[]{𝗱/2,𝗱/2}, 0),             // Dash pattern for incircle circumference
+      𝕕InCircleRadii = new DashPathEffect(new float[]{𝗱/2,𝗱/4}, 0),             // Dash pattern for incircle radii to touch points
+      𝕕InCircleAway  = new DashPathEffect(new float[]{𝗱/4,𝗱/4}, 0);             // Dash pattern for incircle radii away from touch points
+
+    boolean q, 𝗾, 𝕢;                                                            // Isoceles with this angle at the apex = dash lines from this vertex
+    boolean circumCircle        () {return true;}                               // Draw green circle through the vertices of the triangle
+    boolean ninePointCircle     () {return true;}                               // Draw red circle through the mid point of each side
+    boolean ninePointCircleRadii() {return true;}                               // Draw radii of nine point circle
+    boolean ninePointCircleAway () {return true;}                               // Draw away radii of nine point circle
+    boolean centroid            () {return true;}                               // Draw yellow lines from vertices to mid point of the opposite side
+    boolean orthoCentre         () {return true;}                               // Draw blue lines from vertices to nearest point on the opposite side
+    boolean reflectNinePointCircleDiameter() {return false;}                    // Reflect in a diameter drawn through the NinPointCircle at right angles to Euler's line when close to isoscleses
+    boolean inTriangle          () {return true;}                               // Draw the quarter triangle
+    boolean inCircle            () {return true;}                               // Draw the inscribed circle
+    boolean inCircleRadii       () {return true;}                               // Draw the inscribed circle radii
+    boolean inCircleAway        () {return true;}                               // Draw the inscribed circle away radii
+
+    int 𝝺CircumCircle   () {return 𝝺g;}                                         // Default colours at the moment the radii must be the same as the circles
+    int 𝝺InCircle       () {return 𝝺c;}
+    int 𝝺NinePointCircle() {return 𝝺r;}
+    int 𝝺Centroid       () {return 𝝺y;}
+    int 𝝺OrthoCentre    () {return 𝝺b;}
+    int 𝝺EulersLine     () {return 𝝺w;}                                         // Pretty in Pink but clashes with reference triangle and so white
+    int 𝝺Triangle       () {return 𝝺o;}                                         // Outline of triangle when tracing
+    int 𝝺InTriangle     () {return 𝝺sp;}                                        // Sides of the inner quarter triangle to complete the octagon/pentagon associated with some goals
+
+    class EulerGoal extends AngleGoal
+     {final float a, 𝗮;                                                         // Angles
+      final boolean inTriangle, inCircle;                                       // Show InTriangle, InCircle
+      EulerGoal(final int InTriangle, final int InCircle,                       // > 0 -enable- more compact than true/false
+        final double A, final double 𝗔, final String name)                      // Create angle goals for Eulers line
+       {super(name);
+        a = (float)A; 𝗮 = (float)𝗔;                                             // Save angles
+        inTriangle = InTriangle > 0;                                            // Convert int to boolean
+        inCircle   = InCircle   > 0;
+       }
+      float A() {return a;}  float 𝗔() {return 𝗮;}                              // All The Euler goals have fixed angles
+     } // EulerGoal
+
+    final EulerGoal                                                             // Goals for user to achieve
+      𝝲0649 = new EulerGoal(1,1, 06, 49, "06-49 - 9. on circumcircle and ir meets bisector at base - difficult to be accurate"),
+      𝝲1642 = new EulerGoal(1,1, 16, 42, "16-42 - 9. on circumcircle and ic intersects qt+c possible: c+9c+b+ic possible: 9c+cc  at ccr"),
+      𝝲1840 = new EulerGoal(1,1, 18, 40, "18-40 - 9. on circumcircle and ic tangential to Eulers line"),
+      𝝲1872 = new EulerGoal(0,1, 18, 72, "18-72 - altitude on centroid and incircle in right angle triangle"),
+      𝝲2039 = new EulerGoal(1,1, 20, 39, "20-39 - 9. on circumcircle and ic intersects centroid"),
+      𝝲2238 = new EulerGoal(1,1, 22, 38, "22-38 - 9. on circumcircle and ic tangential to central bisector"),
+      𝝲2273 = new EulerGoal(0,1, 22, 73, "43-55 - altitude on centroid and incircle+orthocentre on incircle"),
+/*ok*/𝝲2323 = new EulerGoal(0,0, 22.5,  22.5,  "Octagon"),                          // The altitudes cross an extension of the reference sides at right angles
+      𝝲2345 = new EulerGoal(0,0, 23, 45, "23-45"                                                       ),
+      𝝲2367 = new EulerGoal(1,1, 23, 67, "23-67 - c+c+ic  and RA"),
+      𝝲2436 = new EulerGoal(1,1, 24, 36, "24-36 - 9. on circumcircle and ir touches Eulers Line"),
+      𝝲2452 = new EulerGoal(1,1, 24, 52, "24-52 - a+b+c and e+i+r"),
+      𝝲2474 = new EulerGoal(0,1, 24, 74, "24-74 - a+9pr+ic and c+a+q"),
+      𝝲2733 = new EulerGoal(1,1, 27, 33, "27-33 - 9. on circumcircle and ir touches central bisector"),
+      𝝲2745 = new EulerGoal(0,0, 27, 45, "27-45 perhaps: a+c+qt"                                       ),
+      𝝲2828 = new EulerGoal(0,0, 28, 28, "IntersectionOfNinePointCentreWithCircumCircleAtSideBisectors"),
+      𝝲2853 = new EulerGoal(1,1, 28, 53, "28-53 - a+b+c and b+c+ic"),
+/*ok*/𝝲3030 = new EulerGoal(0,0, 30, 30, "Hexagon: IntersectionOfNinePointCentreAtAVertex"                     ),  // Altitudes are tangential to nine point circle which is an exicircle of the bisectors of the sides of the reference triangle and its base being tangential to the bisectors
+      𝝲3045 = new EulerGoal(0,0, 30, 45, "30-45"                                                      ),
+      𝝲3060 = new EulerGoal(1,1, 30, 60, "30-60 - b+c+ir and right angle"),
+      𝝲3165 = new EulerGoal(0,1, 31, 65, "31-65 - a+b+9rc+ic"),
+      𝝲3166 = new EulerGoal(1,1, 31, 66, "31-66 - a+b+qt+ic"),
+      𝝲3258 = new EulerGoal(1,1, 32, 58, "32-58 - a+qt+nr+b"),
+      𝝲3267 = new EulerGoal(0,1, 32, 67, "32-67 - altitude, centroid, side bisector on incircle"),
+      𝝲3345 = new EulerGoal(0,0, 33, 45, "33-45"                                                      ),
+/*ok*/𝝲3434 = new EulerGoal(0,0, 34.26, 34.26, "DiameterOfNinePointCircleIsChordOfCircumCircle"        ),  // See tests/Euler-34-34.pl
+      𝝲3473 = new EulerGoal(1,1, 34, 73, "34-73 - b+b+q+ic perhaps: b+qt+ic"),
+/*ok*/𝝲3555 = new EulerGoal(0,0, 35.26, 54.74, "CentroidAltitudeBisectorInRATriangle"                  ),  // see ../tests
+      𝝲3561 = new EulerGoal(0,1, 35, 61, "35-61 - a+ic+qt and orthocentre on incircle, possible: b+c+ir"),
+      𝝲3567 = new EulerGoal(0,1, 35, 67, "35-67 - a+ir+qt+c"                                           ),
+/*ok*/𝝲3636 = new EulerGoal(0,0, 36, 36, "Pentagon"                                                    ),  // Drag apex of reference triangle to apex of pentagon drawn inside nine point circle
+      𝝲3753 = new EulerGoal(1,1, 37, 53, "37-53 - 9c+ir and right angled"),
+/*ok*/𝝲3838 = new EulerGoal(0,0, 37.76, 37.76, "IntersectionOfCentroidAndCircumCircle"                 ),  // Divides Euler's line into 6 equal pieces
+      𝝲4056 = new EulerGoal(0,1, 40, 56, "40-56 Altitude on side bisector and incircle radius"         ),
+      𝝲4155 = new EulerGoal(0,1, 41, 55, "41-55 - altitude on centroid and incircle"                   ),
+      𝝲4260 = new EulerGoal(0,0, 42, 60, "42-60"                                                       ),
+/*ok*/𝝲4545 = new EulerGoal(0,0, 45, 45, "IsocelesRightAngleTriangle"                                  ),  // Altitudes plus side bisectors make a square with Euler's line and the nine point circle radii making diagonals
+      𝝲4557 = new EulerGoal(0,0, 45, 57, "a+b+c and a+b+base"                                          ),
+      𝝲4559 = new EulerGoal(1,0, 45, 59, "45-59 - on intriangle"                                       ),
+      𝝲4561 = new EulerGoal(1,0, 45, 61, "45-61 - on intriangle"                                       ),
+      𝝲4564 = new EulerGoal(1,0, 45, 63, "45-63 - on intriangle"                                       ),
+      𝝲4658 = new EulerGoal(1,0, 46, 58, "46-58 - a+qt+ir"                                             ),
+      𝝲4667 = new EulerGoal(1,0, 46, 67, "46-67 - a+qt+iw iosceles"                                    ),
+      𝝲4848 = new EulerGoal(1,0, 48, 48, "48-48 - 9. on incircle in isosceles triangle - might have to constrain drawing to iosceles for this to be meaningful"),
+      𝝲5059 = new EulerGoal(1,0, 50, 59, "50-59 - on intriangle"                                       ),
+      𝝲5178 = new EulerGoal(1,0, 51, 78, "51-78 - a+b+it iosceles"                                     ),
+      𝝲5264 = new EulerGoal(1,0, 52, 64, "52-64 - b+c+qt iosceles"                                     ),
+      𝝲5555 = new EulerGoal(1,0, 55, 55, "55-55 - inscribed triangle bisected by Euler's line"         ),
+      𝝲𝝲 = null;
+
+
+    EulerGoal currentGoal;                                                      // The current goal
+    void setGoal()                                                              // Override this goal as desired
+     {currentGoal = 𝝲3555;
+      super.setCurrentGoal(currentGoal);
+     }
+
+    void overlayItems(Drawing 𝗱)                                                // Draw additional items -  inthis case Euler's line as a diameter
+     {if (findEulersLine())                                                     // Find points on Euler's line
+       {𝗱.new Diameter() {{n="el"; c1=𝝺sc; c2=𝝺sg; C=𝝺EulersLine();
+        𝞈=𝞈Rotation; 𝕩 = 𝝼.x; 𝕪 = 𝝼.y;                                          // Make Euler's line a rotation controller about the centre of the nine point circle
+        bp(e.x, e.y, 𝗲.x, 𝗲.y); reflect = false; trace=false;}};                // Switching off tracing of this item helps to simplify the complex image that we get when tracing
        }
      }
-    boolean bigCircle(float 𝗮, float 𝗿,                                         // Draw a segment of a big circle spanning an angle of 𝗮  with radius 𝗿
-      float x1, float y1, float ax, float ay, float x2, float y2)               // starting at point(x1,y1), centred at point(ax,ay), finishing at point (x2,y2)
+
+    void drawOverlay()                                                          // Draw overlay: either one standard one, or a bright one over a pale one
+     {if (!findEulersLine()) return;                                            // Find Eulers line and proceed if we can, else draw nothing
+      if (makeTracing())                                                        // Tracing of overlay
+       {drawOverlay(true, Integer.valueOf(96), null, 0, 0);                     // Pale - but undashed
+        drawOverlay(true, null, 𝕕1, 𝞈Translation.aldx, 𝞈Translation.aldy);      // Strong but dashed
+       }
+      else
+       {drawOverlay(false, null, null, 0, 0);                                   // Standard overlay
+       }
+     }
+    void drawOverlay(final boolean tracing, final Integer Opacity,              // Draw the overlay possibly with a non default opacity and dashes
+      final DashPathEffect Dash, final float Dx, final float Dy)                // Optionally translated
+     {final float a=𝘁.a, 𝗮=𝘁.𝗮, 𝕒=𝘁.𝕒, x=𝘁.x, y=𝘁.y, 𝘅=𝘁.𝘅, 𝘆=𝘁.𝘆, 𝕩=𝘁.𝕩, 𝕪=𝘁.𝕪;
+      final int 𝝺cc = 𝝺CircumCircle(), 𝝺oc = 𝝺OrthoCentre(), 𝝺cd = 𝝺Centroid(), // Finalize colours of lines/circle/radii in overlay
+        𝝺nc = 𝝺NinePointCircle(), 𝝺t = 𝝺Triangle();
+      final boolean tracingUpper = Dash != null;
+
+      q = nearAngle(𝗮,𝕒) < 1; 𝗾 = nearAngle(a,𝕒) < 1; 𝕢 = nearAngle(a,𝗮) < 1;   // Closeness to isoceles
+      overlayMirror.clear();                                                    // Clear mirror stack as mirrors are not at a fixed location
+      canvas.save();                                                            // Save canvas translation so we can restore it later
+// Rotation action
+      if (tracingUpper)                                                         // Draw tracing upper layer
+       {if (false) {}
+//      if      (currentGoal == 𝝲i9v)                                           // Goal specific rotations obtained by dragging on Euler's line
+//       {if      (q) canvas.rotate(𝞈Rotation.angle, x, y);                     // Shows that the triangle formed by the alitudes is equilateral
+//        else if (𝗾) canvas.rotate(𝞈Rotation.angle, 𝘅, 𝘆);
+//        else if (𝕢) canvas.rotate(𝞈Rotation.angle, 𝕩, 𝕪);
+//       }
+        else if (currentGoal == 𝝲4545) canvas.rotate(𝞈Rotation.angle, 𝝼.x, 𝝼.y);// Hexagon
+        else if (currentGoal == 𝝲2323) canvas.rotate(𝞈Rotation.angle, e.x, e.y);// Pentagon with centre at circumcentre
+        else if (currentGoal == 𝝲2323) canvas.rotate(𝞈Rotation.angle, 𝝼.x, 𝝼.y);// Octagon with centre at nine point circle centre
+       }
+// Initialize canvas
+      canvas.translate(Dx, Dy);                                                 // Allows us to temporarily see a bit more of the drawing
+      opacityOverride = Opacity;                                                // Possibly change opacity
+      dashOverride = Dash;                                                      // Possibly make everying dashed
+// Mirrors
+      if (reflectNinePointCircleDiameter() && (q || 𝗾 || 𝕢) && !(q && 𝗾 && 𝕢))  // Reflect in a diameter drawn through the NinePointCircle at right angles to Euler's line when close to isosceles but avoid am equliateral becuase too sensitive
+       {final float dx = 𝗲.y-e.y, dy = e.x-𝗲.x;                                 // Mirror vector
+        overlayMirror.push(new Mirror(𝝼.x, 𝝼.y, 𝝼.x+dx, 𝝼.y+dy));               // Save mirror
+       }
+//    if (currentGoal == 𝝲iab)                                                  // Mirrors through centre of circumcircle allow creation of equilateral triangle, square, pentagon, hexagon
+//     {createAMirrorIfNotParallelToEulerLine(x, y, e, 𝗲);
+//      createAMirrorIfNotParallelToEulerLine(𝘅, 𝘆, e, 𝗲);
+//      createAMirrorIfNotParallelToEulerLine(𝕩, 𝕪, e, 𝗲);
+//     }
+// Completed goals
+      if (currentGoal != null && currentGoal.achievedGoal() && !pressed)        // Achieved goal
+       {if (currentGoal == 𝝲2323)                                               // Draw completion of octagon with centre at nine point circle centre
+         {if      (q) drawOppositeAngleOfQuarterTriangle(x, y, 𝘅, 𝘆, 𝕩, 𝕪);
+          else if (𝗾) drawOppositeAngleOfQuarterTriangle(𝘅, 𝘆, 𝕩, 𝕪, x, y);
+          else if (𝕢) drawOppositeAngleOfQuarterTriangle(𝕩, 𝕪, x, y, 𝘅, 𝘆);
+         }
+        else if (currentGoal == 𝝲3555)                                          // User goal achieved
+         {sortSides(x, y, 𝘅, 𝘆, 𝕩, 𝕪);                                          // Sort the sides and put the results in c, 𝗰, 𝕔
+          if (findOrthoCentre(𝗽, (c.x+𝗰.x)/2, (c.y+𝗰.y)/2, 𝗰.x, 𝗰.y, 𝕔.x, 𝕔.y))
+           {setPaint(𝝺w, t); drawCircle(𝗽.x, 𝗽.y, 32);
+           }
+         }
+        else if (currentGoal == 𝝲3636) drawPentagon(𝝼, 𝗲, 𝝼r);                  // User goal achieved - show pentagon
+       }
+// Draw triangle
+      if (true)                                                                 // Draw the outline of the triangle
+       {if (tracing) setPaint(𝝺t, 𝕕InTriangle); else setPaint(𝝺t);
+        drawLine(x, y, 𝘅, 𝘆); drawLine(𝘅, 𝘆, 𝕩, 𝕪); drawLine(𝕩, 𝕪, x, y);
+       }
+// Draw quarter triangle
+      if (inTriangle() || (currentGoal != null && currentGoal.inTriangle))      // Draw the quarter triangle
+       {setPaint(𝝺InTriangle(), 𝕕InTriangle);
+        drawLine((x+𝘅)/2, (y+𝘆)/2, (𝘅+𝕩)/2, (𝘆+𝕪)/2);
+        drawLine((𝘅+𝕩)/2, (𝘆+𝕪)/2, (𝕩+x)/2, (𝕪+y)/2);
+        drawLine((𝕩+x)/2, (𝕪+y)/2, (x+𝘅)/2, (y+𝘆)/2);
+       }
+// Draw InCircle
+      if (inCircle() || (currentGoal != null && currentGoal.inCircle))          // Draw the in circle
+       {drawInCircle(x,y, 𝘅,𝘆, 𝕩,𝕪);                                            // Draw in-circle if requested
+       }
+// Draw elements of Euler's line
+      if (circumCircle())                                                       // Draw Circum-circle if requested
+       {drawCircleThroughThreePoints(𝕕1, 𝝺cc, 𝝺cc, 0, 0, a, 𝗮, 𝕒, x, y, 𝘅, 𝘆, 𝕩, 𝕪);
+       }
+
+      if (orthoCentre()) drawOrthoCentre(𝕕2, 𝝺oc, x, y, 𝘅, 𝘆, 𝕩, 𝕪);            // Draw perpendicular lines through orthocentre if requested
+
+      if (centroid())                                                           // Draw lines through centroid if requested
+       {fMid(c2, x,y, 𝘅,𝘆, 𝕩,𝕪);                                                 // Find perpendicular from each vertex to opposite side
+        fMid(𝗰2, 𝘅,𝘆, 𝕩,𝕪, x,y);
+        fMid(𝕔2, 𝕩,𝕪, x,y, 𝘅,𝘆);
+        setPaint(𝝺cd);                                                          // Color of lines through centroid
+        setDash(𝕕3); drawLine(c2);
+        set𝗗ash(𝕕3); drawLine(𝗰2);
+        set𝔻ash(𝕕3); drawLine(𝕔2);
+       }
+
+      if (ninePointCircle())                                                    // Draw nine point circle if requested
+       {final float X = (x + 𝘅)/2, Y = (y + 𝘆)/2,                               // Mid points
+                    𝗫 = (𝘅 + 𝕩)/2, 𝗬 = (𝘆 + 𝕪 )/2,
+                    𝕏 = (x + 𝕩)/2, 𝕐 = (y + 𝕪)/2,
+          A = angle(𝗫, 𝗬, X, Y, 𝕏, 𝕐),                                          // Angle of each vertex
+          𝗔 = angle(𝕏, 𝕐, 𝗫, 𝗬, X, Y),
+          𝔸 = angle(X, Y, 𝕏, 𝕐, 𝗫, 𝗬);
+        drawCircleThroughThreePoints(𝕕4, 𝝺nc, 0, 𝝺nc, 𝝺nc, A, 𝗔, 𝔸, X, Y, 𝗫, 𝗬, 𝕏, 𝕐);
+       }
+
+      if ((q || 𝗾 || 𝗾) && !(q && 𝗾 && 𝗾)) drawMirrors(𝝺nc, 𝝺w, 𝕕1, 𝕕3);        // Draw any mirrors that have been created
+
+      drawEulersLine();                                                         // Draw Euler's line and show divison of line between centres
+      opacityOverride = null;                                                   // Back to normal opacity
+      dashOverride = Dash;                                                      // Remove dashes
+      canvas.restore();                                                         // Restore canvas translation
+     }
+    void drawOppositeAngleOfQuarterTriangle                                     // Draw the opposite angle of the quarter triangle
+     (final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {setPaint(𝝺InTriangle());
+      drawLine((x+𝘅)/2, (y+𝘆)/2, (𝘅+𝕩)/2, (𝘆+𝕪)/2);
+      drawLine((x+𝕩)/2, (y+𝕪)/2, (𝘅+𝕩)/2, (𝘆+𝕪)/2);
+     }
+    boolean findEulersLine()                                                    // Find Eulers line
+     {final float a=𝘁.a, 𝗮=𝘁.𝗮, 𝕒=𝘁.𝕒, x=𝘁.x, y=𝘁.y, 𝘅=𝘁.𝘅, 𝘆=𝘁.𝘆, 𝕩=𝘁.𝕩, 𝕪=𝘁.𝕪;
+      if (findCentreOfCircleThroughThreePoints(e, x,y, 𝘅,𝘆, 𝕩,𝕪) &&             // Find Circum centre - one end of Euler's line
+          findCentroid                        (𝗸, x,y, 𝘅,𝘆, 𝕩,𝕪) &&             // Centroid
+          findCentreOfNinePointCircle         (𝝼, x,y, 𝘅,𝘆, 𝕩,𝕪) &&             // Centre of Nine point circle
+          findOrthoCentre                     (𝗲, x,y, 𝘅,𝘆, 𝕩,𝕪))               // Find orthoCentre - other end of Euler's line
+       {er = d(e.x-x, e.y-y);                                                   // Radius is distance from the centre to a corner
+        𝝼r = d(𝝼.x-(x+𝘅)/2, 𝝼.y-(y+𝘆)/2);                                       // Radius is distance from the centre to a mid point
+        return true;
+       }
+      return false;
+     }
+    void drawEulersLine()                                                       // Draw Euler's line and show divison of line between centres
+     {final float a=𝘁.a, 𝗮=𝘁.𝗮, 𝕒=𝘁.𝕒, x=𝘁.x, y=𝘁.y, 𝘅=𝘁.𝘅, 𝘆=𝘁.𝘆, 𝕩=𝘁.𝕩, 𝕪=𝘁.𝕪;
+      if (findEulersLine())                                                     // Find Euler's line
+       {setPaint(𝝺EulersLine(), 𝕕1); drawLine(e, 𝗲);                            // Draw Euler's line
+       }
+     }
+    void createAMirrorIfNotParallelToEulerLine                                  // Create a mirror unless it would be parallel to Euler's line
+     (final float x, final float y, final PointF e, final PointF 𝗲)
+     {if (nearAngle(angle(x, y, e.x, e.y, 𝗲.x, 𝗲.y), 0) > 1)                    // Not parallel to Euler's line
+       {overlayMirror.push(new Mirror(e.x, e.y, x, y));                         // Save mirror
+       }
+     }
+
+    void setDash(DashPathEffect dash) {paint.setPathEffect(q ? dash : dashOverride);}   // Goto dash effect for lines that would otherwise be on top of each other
+    void set𝗗ash(DashPathEffect dash) {paint.setPathEffect(𝗾 ? dash : dashOverride);}
+    void set𝔻ash(DashPathEffect dash) {paint.setPathEffect(𝕢 ? dash : dashOverride);}
+
+    boolean findOrthoCentre(PointF 𝗰,                                           // Place centre of circle throught three points in 𝗰 and return true is the centre was found else false
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {fPerp(a2, x,y, 𝘅,𝘆, 𝕩,𝕪);                                                 // Find perpendicular from each vertex to opposite side
+      fPerp(𝗮2, 𝘅,𝘆, 𝕩,𝕪, x,y);
+      fPerp(𝕒2, 𝕩,𝕪, x,y, 𝘅,𝘆);
+      return intersectionPoint(𝗰, a2, 𝗮2);                                        // Find orthoCentre if possible
+     }
+    void drawOrthoCentre(final DashPathEffect dash, final int 𝝺,                // Draw  ortho-centre in this colour
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {if (orthoCentre())                                                        // Draw perpendicular lines through orthocentre - there is no obvious circle through this point
+       {fPerp(a2, x,y, 𝘅,𝘆, 𝕩,𝕪);                                               // Find perpendicular from each vertex to opposite side
+        fPerp(𝗮2, 𝘅,𝘆, 𝕩,𝕪, x,y);
+        fPerp(𝕒2, 𝕩,𝕪, x,y, 𝘅,𝘆);
+        if (findOrthoCentre(𝗲, x,y, 𝘅,𝘆, 𝕩,𝕪))                                  // Find orthoCentre if possible
+         {setPaint(𝝺);
+          setDash(dash);
+          drawLine(a2.left, a2.top, 𝗲.x, 𝗲.y                   );                 // Draw lines from vertices to intersection and to
+          drawLine(                 𝗲.x, 𝗲.y, a2.right, a2.bottom);
+
+          set𝗗ash(dash);
+          drawLine(𝗮2.left, 𝗮2.top, 𝗲.x, 𝗲.y                   );
+          drawLine(                 𝗲.x, 𝗲.y, 𝗮2.right, 𝗮2.bottom);
+
+          set𝔻ash(dash);
+          drawLine(𝕒2.left, 𝕒2.top, 𝗲.x, 𝗲.y                   );
+          drawLine(                 𝗲.x, 𝗲.y, 𝕒2.right, 𝕒2.bottom);
+         }
+       }
+     }
+    boolean findCentroid(PointF 𝗰,                                              // Find centroid and place it in point(𝗰)
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {fMid(c2, x,y, 𝘅,𝘆, 𝕩,𝕪);                                                 // Find perpendicular from each vertex to opposite side
+      fMid(𝗰2, 𝘅,𝘆, 𝕩,𝕪, x,y);
+      return intersectionPoint(𝗰, c2, 𝗰2);                                      // Centroid is at intersection of line from apex to opposite side
+     }
+    boolean findCentreOfNinePointCircle(PointF 𝗰,                               // Find centre of nine point circle and place it in point(𝗰)
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {final float X = (x + 𝘅)/2, Y = (y + 𝘆)/2,                                 // Mid points
+                  𝗫 = (𝘅 + 𝕩)/2, 𝗬 = (𝘆 + 𝕪)/2,
+                  𝕏 = (x + 𝕩)/2, 𝕐 = (y + 𝕪)/2;
+      return findCentreOfCircleThroughThreePoints(𝗰, X, Y, 𝗫, 𝗬, 𝕏, 𝕐);         // Centre of mid points
+     }
+    boolean findCentreOfCircleThroughThreePoints(PointF 𝗰,                      // Place centre of circle throught three points in 𝗰, bisectors in n,𝗻,𝕟 and return true is the centrewas found else false
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {fSide(s2, x,y, 𝘅,𝘆);                                                      // Find bisector of each side n,𝗻,𝕟 are predefined to save allocations
+      fSide(𝘀2, 𝘅,𝘆, 𝕩,𝕪);
+      fSide(𝕤2, 𝕩,𝕪, x,y);
+      return intersectionPoint(𝗰, s2, 𝘀2);                                      // Intersection of side bisectors
+     }
+    final PointF drawCircleThroughThreePoints = new PointF();                   // Work area    final PointF drawCircleThroughThreePointsOpposite = new PointF();           // Work area
+    void drawCircleThroughThreePoints(final DashPathEffect dash,                // Draw a circle through three supplied points if possible and return true with the centre in 𝗽, else false
+      final int 𝝺Circle, final int 𝝺Radii,                                      // Colours
+      final int 𝝺RadiiVertices,  final int 𝝺AwayVertices,                       // Colours for radii to and away from the vertices
+      final float 𝗮, final float 𝗯, final float 𝗰,                              // Angles of triangle
+      final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices of triangle
+      final float 𝕩, final float 𝕪)
+     {if (!findCentreOfCircleThroughThreePoints(𝗽, x,y, 𝘅,𝘆, 𝕩,𝕪)) return;      // Find centre of circle - return if it cannot be found
+      final float r = d(𝗽.x - x, 𝗽.y - y);                                      // Radius of circle through corners
+      setPaint(𝝺Circle, t);                                                     // For bigCircle()
+      if (!bigCircle(𝗮, r, 𝕩,𝕪, 𝗽, 𝘅,𝘆) &&                                      // Big radius circle draw - skia graphics fail for large radii
+          !bigCircle(𝗯, r, x,y, 𝗽, 𝕩,𝕪) &&
+          !bigCircle(𝗰, r, 𝘅,𝘆, 𝗽, x,y))
+       {if (𝝺Radii != 0)                                                        // Draw radii along bisectors
+         {setPaint(𝝺Radii);
+          set𝔻ash(dash); dSide(𝗽, s2, r); dSide(𝗽, s2, -r);                     // Dashed if close to isosceles
+          setDash(dash); dSide(𝗽, 𝘀2, r); dSide(𝗽, 𝘀2, -r);
+          set𝗗ash(dash); dSide(𝗽, 𝕤2, r); dSide(𝗽, 𝕤2, -r);
+         }
+        if (𝝺RadiiVertices != 0)                                                // Draw radii to vertices
+         {setPaint(𝝺RadiiVertices);
+          set𝔻ash(dash); drawLine(𝗽, x, y);                                     // Dashed if close to isosceles
+          setDash(dash); drawLine(𝗽, 𝘅, 𝘆);
+          set𝗗ash(dash); drawLine(𝗽, 𝕩, 𝕪);
+         }
+        if (𝝺AwayVertices != 0)                                                 // Draw radii away from vertices
+         {final PointF q = drawCircleThroughThreePoints;
+          setPaint(𝝺AwayVertices, 𝕕InCircleAway);                               // Always dashed
+          opposite(x, y, 𝗽, q); drawLine(𝗽, q);
+          opposite(𝘅, 𝘆, 𝗽, q); drawLine(𝗽, q);
+          opposite(𝕩, 𝕪, 𝗽, q); drawLine(𝗽, q);
+         }
+        if (𝝺Circle != 0)                                                       // Draw circle
+         {setPaint(𝝺Circle, t); drawCircle(𝗽.x, 𝗽.y, d(𝗽.x-x, 𝗽.y-y));
+         }
+       }
+     }
+    final PointF drawInCircleCentre = new PointF();                             // Preallocated work area
+    final PointF drawInCircleTouch  = new PointF();                             // Preallocated work area
+    void drawInCircle                                                           // Draw the in-circle through the specified vertices if possible
+     (final float x, final float y, final float 𝘅, final float 𝘆,               // Vertices
+      final float 𝕩, final float 𝕪)
+     {final PointF 𝗽 = drawInCircleCentre;                                      // Name work area
+      if (!icc(𝗽, x,y, 𝘅,𝘆, 𝕩,𝕪)) return;                                       // Find centre of in circle, return if it is not possible to do so
+      if (inCircleRadii() || inCircleAway())                                    // Radii requested
+       {final PointF p = drawInCircleTouch;                                     // Name work area
+        if (pointOnLine(p, 𝗽.x, 𝗽.y, x, y, 𝘅, 𝘆)) drawInCircleRadius(𝗽, p);
+        if (pointOnLine(p, 𝗽.x, 𝗽.y, 𝘅, 𝘆, 𝕩, 𝕪)) drawInCircleRadius(𝗽, p);
+        if (pointOnLine(p, 𝗽.x, 𝗽.y, 𝕩, 𝕪, x, y)) drawInCircleRadius(𝗽, p);
+       }
+      if (inCircle())                                                           // InCircle requested
+       {final Float r = pointToLine(𝗽.x, 𝗽.y, x, y, 𝘅, 𝘆);
+        if (r != null)                                                          // Draw circle if we have a radius
+         {setPaint(𝝺InCircle(), t, 𝕕InCircle);
+          drawCircle(𝗽.x, 𝗽.y, r);
+         }
+       }
+     }
+    final PointF drawInCircleRadius = new PointF();                             // Preallocated work area
+    void drawInCircleRadius(final PointF c, final PointF p)                     // Draw the in-circle radii
+     {if (inCircleRadii())                                                      // Radius to touch point on side
+       {setPaint(𝝺InCircle(), 𝕕InCircleRadii); drawLine(c, p);
+       }
+      if (inCircleAway())                                                       // Radius away - opposite to the radius to the touch point on the side
+       {final PointF q = drawInCircleRadius;
+        setPaint(𝝺InCircle(), 𝕕InCircleAway); opposite(p, c, q); drawLine(c, q);
+       }
+     }
+    boolean icc(final PointF 𝗰, final float x, final float y,                   // Find centre of in-circle and place it in point 𝗰 and return true if teh centre has been found else return false
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {bisectAngle(v2, x,y, 𝘅,𝘆, 𝕩,𝕪);                                           // Find bisector of each angle
+      bisectAngle(𝘃2, 𝘅,𝘆, 𝕩,𝕪, x,y);
+      return intersectionPoint(𝗰, v2, 𝘃2);                                      // Find centre of in-circle and place it in point 𝗽
+     }
+    void drawPentagon(final PointF 𝗰, final PointF 𝗮, final float r)            // Draw a pentagon in a circle centred at point(𝗰), radius(r) and with its apex pointing at 𝗮
+     {final float X = cd(72), Y = os(X, 1), d = d(𝗰, 𝗮),                        // Coordinates of first corner of a pentagon centred at point(0,0) with apex at point(1,0)
+        x = (𝗮.x-𝗰.x)/d, y = (𝗮.y-𝗰.y)/d,                                       // Unit vector towards apex = corner 1
+        𝘅 = X*x-Y*y, 𝘆 = X*y+Y*x,  𝗫 = X*x+Y*y, 𝗬 = X*y-Y*x,                    // Corners 2,5 of unit pentagon pointing at point(𝗮)
+        𝕩 = X*𝘅-Y*𝘆, 𝕪 = X*𝘆+Y*𝘅,  𝕏 = X*𝗫+Y*𝗬, 𝕐 = X*𝗬-Y*𝗫,                    // Corners 3,4
+       cx = 𝗰.x, cy = 𝗰.y;                                                      // Centre of pentagon
+      setPaint(𝝺InTriangle());
+      drawLine(cx+r*x, cy+r*y, cx+r*𝘅, cy+r*𝘆);                                 // Scale pentagon up and draw it
+      drawLine(cx+r*x, cy+r*y, cx+r*𝗫, cy+r*𝗬);
+      drawLine(cx+r*𝘅, cy+r*𝘆, cx+r*𝕩, cy+r*𝕪);
+      drawLine(cx+r*𝗫, cy+r*𝗬, cx+r*𝕏, cy+r*𝕐);
+      drawLine(cx+r*𝕩, cy+r*𝕪, cx+r*𝕏,  cy+r*𝕐);
+     }
+    boolean bigCircle(final float 𝗮, final float 𝗿,                             // Draw a segment of a big circle spanning an angle of 𝗮  with radius 𝗿
+      final float x, final float y, final PointF 𝗽,                             // Starting at point(x,y), centred at point(𝗽)
+      final float 𝘅, final float 𝘆)                                             // Finishing at point (𝘅,𝘆)
      {final int N = 100;                                                        // Number of line segments
       if (nearAngle(𝗮, 180) > 1) return false;                                  // Not a big circle around this angle
-      final float a = (2*𝗮-360)/N, b = angle(x1, y1, 𝗽.x, 𝗽.y);                 // Interior angle step (avoid division in loop), start angle
+      final float a = (2*𝗮-360)/N, b = angle(x, y, 𝗽.x, 𝗽.y);                   // Interior angle step (avoid division in loop), start angle
       final float[]L = new float[4*(N+1)];                                      // Line segments
-      L[0] = x1; L[1] = y1;                                                     // Duplicate first line to avoid if statement in following loop
+      L[0] = x; L[1] = y;                                                       // Duplicate first line to avoid if statement in following loop
       final float cx = 𝗽.x, cy = 𝗽.y;                                           // Centre of circle optimized for easy access
       for(int i = 1; i <= N; ++i)                                               // Load line segments
        {final float A = b + i * a, dx = 𝗿*cd(A), dy = 𝗿*sd(A);
         L[4*i+0] = L[4*i-2] = cx+dx;                                            // Start of this line segment is the same as the end of the last segment
         L[4*i+1] = L[4*i-1] = cy+dy;
        }
-      L[4*N+2] = x2; L[4*N+3] = y2;                                             // Duplicate first line to avoid if statement in following loop
-      canvas.drawLines(L, paint);                                               // Paint lines with one subroutine call
+      L[4*N+2] = 𝘅; L[4*N+3] = 𝘆;                                               // Duplicate first line to avoid if statement in following loop
+      drawLines(L);                                                             // Paint lines with one subroutine call
       return true;
      }
-    void fSide(RectF 𝗻, float x1, float y1, float x2, float y2)                 // Find line (n) at right angles through the centre of the specified line
-     {final float x = x2 - x1, y = y2 - y1, 𝕩 = y, 𝕪 = -x;
-      𝗻.set(x1+x/2, y1+y/2, x1+x/2-𝕩, y1+y/2-𝕪);                                // Normal
+    void fSide(final RectF n,                                                   // Find line (n) at right angles through the centre of the specified line segment
+      final float x, final float y, final float 𝘅, final float 𝘆)
+     {final float 𝕩 = 𝘆 - y, 𝕪 = x - 𝘅;
+      n.set((x+𝘅)/2, (y+𝘆)/2, (x+𝘅)/2-𝕩, (y+𝘆)/2-𝕪);                            // Normal
      }
-    void fAngle(RectF 𝗯,                                                        // Find line(b) which bisects the angle at point(x2,y2)
-      float x1, float y1, float x2, float y2, float x3, float y3)
+    void fPerp(final RectF 𝗮, final float x, final float y,                     // Find line(𝗮) from vertex(x,y) perpendicular to line through point(𝘅,𝘆) and point(𝕩,𝕪)
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
+     {if (pointToLine(𝗽, x,y, 𝘅,𝘆, 𝕩,𝕪))                                        // Vector to line
+       {𝗮.set(x, y, x+𝗽.x, y+𝗽.y);                                              // Point, intersection point
+       }
+     }
+    void fMid(final RectF 𝗮, final float x, final float y,
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)               // Find line(𝗮) from vertex(x,y) to line through mid point of line segment through point(𝘅,𝘆) and point(𝕩,𝕪)
+     {𝗮.set(x, y, (𝘅+𝕩)/2, (𝘆+𝕪)/2);
+     }
+    void bisectAngle(final RectF 𝗯, final float x, final float y,               // Find line which bisects the angle at point(𝘅,𝘆) and load it into 𝗯
+      final float 𝘅, final float 𝘆, final float 𝕩, final float 𝕪)
      {final float                                                               // Split angle
-        a = angle(x3,y3, x2,y2, x1,y1),                                         // Angle sweep
-        b = angle(x3,y3, x2,y2),                                                // Angle position
+        a = angle(𝕩,𝕪, 𝘅,𝘆, x,y),                                               // Angle sweep
+        b = angle(𝕩,𝕪, 𝘅,𝘆),                                                    // Angle position
         c = a/2+b;                                                              // Angular direction of bisector
-      𝗯.set(x2, y2, x2+cd(c), y2+sd(c));                                        // Bisector
+      𝗯.set(𝘅, 𝘆, 𝘅+cd(c), 𝘆+sd(c));                                            // Bisector
      }
-    boolean intersectionPoint(RectF l, RectF L)                                 // Find intersection of two lines expressed as rectangles
-     {return intersection(𝗽, l.left,l.top,l.right,l.bottom,
-                             L.left,L.top,L.right,L.bottom);
+    boolean intersectionPoint(final PointF 𝗽, final RectF l, final RectF L)     // Find intersection of two lines expressed as rectangles and place the result in 𝗽 and return true else return false
+     {return intersection(𝗽, l.left, l.top, l.right, l.bottom,
+                             L.left, L.top, L.right, L.bottom);
      }
-    void dSide(RectF 𝗿, float r)                                                // Draw bisection of each side from centre point(p) through half of each side(𝗿) to circle radius(r)
+    void dSide(final PointF 𝗽, final RectF 𝗿, final float r)                    // Draw bisection of each side from centre point(𝗽p) through half of each side(𝗿) to circle radius(r)
      {final float x = 𝗿.left - 𝗽.x, y = 𝗿.top - 𝗽.y, d = d(x, y);               // Vector from circle centre to side, length of vector
-      if (d < 1) return;                                                        // So close there is no need to draw a line
-      canvas.drawLine(𝗽.x, 𝗽.y, 𝗽.x + r * x / d, 𝗽.y + r * y / d, paint);       // Line from centre of circle to circumference
+      if (d < 1e-3) return;                                                     // So close there is no need to draw a line
+      drawLine(𝗽.x, 𝗽.y, 𝗽.x + r * x / d, 𝗽.y + r * y / d);                     // Line from centre of circle to circumference
      }
-    void dAngle(PointF p, float x, float y)                                     // Draw bisection of each angle
-     {canvas.drawLine(p.x, p.y, x, y, paint);
-     }
-
-    void pointerReleased(final float[]𝘁)                                        // Pointer released - make isosceles or equilateral if close to same
-     {final float 𝗮=𝘁[0], 𝗯=𝘁[1], 𝗰=𝘁[2];                                       // Angles
-      improve(𝘁);
-      if (nearAngle(180, 𝗮) < 1 ||
-          nearAngle(180, 𝗯) < 1 ||
-          nearAngle(180, 𝗰) < 1) achieved(this, "Line");                        // Achieved straight line
-     }
-   } // Circle3Points
+    boolean translate() {return true;}                                          // Allow translation by dragging on the sides as opposed to the tabs so we can temporarily see other parts of the drawing - reset when the user touches someting other than a side of the reference triangle
+   } // EulerLine
 //------------------------------------------------------------------------------
-// Quarter Triangles: show quarter triangles generated by halving the sides and
+// 𝕼uarter Triangles: show quarter triangles generated by halving the sides and
 // by reflecting the apex
 //------------------------------------------------------------------------------
   class QuarterTriangles extends DraggableTriangle
@@ -2260,19 +3190,18 @@ number of vertices in each layer for each item.
     int 𝝺d21() {return 𝝺m;} int 𝝺d22() {return 𝝺y;}                             // Diameter colour for the all important side 2 background
 
     QuarterTriangles(final Activity Activity) {super(Activity.this);}           // Create display
-    void underlayItems(Drawing 𝗱, final float[]𝘁)                               // Override to add additional items to be drawn under the triangle
-     {final float 𝗮=𝘁[0],  𝗯=𝘁[1],  𝗰=𝘁[2],
-        x1=𝘁[3], y1=𝘁[4], x2=𝘁[5], y2=𝘁[6], x3=𝘁[7], y3=𝘁[8],
+    void underlayItems(Drawing 𝗱)                                               // Override to add additional items to be drawn under the triangle
+     {final float x1=𝘁.x, y1=𝘁.y, x2=𝘁.𝘅, y2=𝘁.𝘆, x3=𝘁.𝕩, y3=𝘁.𝕪,
         x12 = (x1+x2)/2,   y12 = (y1+y2)/2,                                     // Halfway points
         x31 = (x3+x1)/2,   y31 = (y3+y1)/2,
         𝕩   = (x12+x31)/2, 𝕪   = (y12+y31)/2,
         a   = angle(x3, y3, x2, y2);                                            // Mirror parallel to third side, half way down the other two sides
-      𝗱.createMirror(null, 1, 𝕩, 𝕪, a,    false, true, false);                  // Fixed mirror parallel to third side, half way down the other two sides reflects only real vertices in front of it
-      𝗱.createMirror(null, 2, 𝕩, 𝕪, a+90, false, false, true);                  // Fixed mirror at right angles to the mirror above to create central triangle - only reflects reflected points
+      𝗱.createMirror(null, 1, 𝕩, 𝕪, a,    false, true, false, true);            // Fixed mirror parallel to third side, half way down the other two sides reflects only real vertices in front of it
+      𝗱.createMirror(null, 2, 𝕩, 𝕪, a+90, false, false, true, true);            // Fixed mirror at right angles to the mirror above to create central triangle - only reflects reflected points
      }
-    void pointerReleased(final float[]𝘁)                                        // Pointer released
-     {final float 𝗮=𝘁[0], 𝗯=𝘁[1], 𝗰=𝘁[2],
-        x1=𝘁[3], y1=𝘁[4], x2=𝘁[5], y2=𝘁[6], x3=𝘁[7], y3=𝘁[8],
+    void pointerReleased()                                                      // Pointer released
+     {final float
+        x1=𝘁.x, y1=𝘁.y, x2=𝘁.𝘅, y2=𝘁.𝘆, x3=𝘁.𝕩, y3=𝘁.𝕪,
         x21 = (x2-x1)/2, y21 = (y2-y1)/2,                                       // Halfway point vectors
         x32 = (x3-x2)/2, y32 = (y3-y2)/2,
         x13 = (x1-x3)/2, y13 = (y1-y3)/2,
@@ -2282,7 +3211,7 @@ number of vertices in each layer for each item.
             pr(x32, y32) || pr(-x32, -y32) ||
             pr(x13, y13) || pr(-x13, -y13)) {}
        }
-      else improve(𝘁);                                                          // Improve triangle
+//      else improve();                                                         // Improve triangle
      }
     boolean pr(float x, float y)                                                // Pointer released
      {final float 𝘅 = 𝞈Translation.aldx, 𝘆 = 𝞈Translation.aldy;                 // Translation in effect
@@ -2291,13 +3220,12 @@ number of vertices in each layer for each item.
       𝞈Translation.aldy = y;
       return true;
      }
-    void overlay(final float[]𝘁)                                                // Override to add additional items to be drawn under the triangle
-     {overlay(𝘁, 𝝺r, 0, 0);
-      overlay(𝘁, 𝝺y, 𝞈Translation.aldx, 𝞈Translation.aldy);
+    void drawOverlay()                                                          // Override to add additional items to be drawn under the triangle
+     {overlay(𝝺r, 0, 0);
+      overlay(𝝺y, 𝞈Translation.aldx, 𝞈Translation.aldy);
      }
-    void overlay(final float[]𝘁, int colour, float dx, float dy)                // Draw the quarter triangles in the indicated colour, possibly shifted by the translation(dx,dy)
-     {final float 𝗮=𝘁[0], 𝗯=𝘁[1], 𝗰=𝘁[2],
-        x1=dx+𝘁[3], y1=dy+𝘁[4], x2=dx+𝘁[5], y2=dy+𝘁[6], x3=dx+𝘁[7], y3=dy+𝘁[8],
+    void overlay(int colour, float dx, float dy)                                // Draw the quarter triangles in the indicated colour, possibly shifted by the translation(dx,dy)
+     {final float x1=dx+𝘁.x, y1=dy+𝘁.y, x2=dx+𝘁.𝘅, y2=dy+𝘁.𝘆, x3=dx+𝘁.𝕩, y3=dy+𝘁.𝕪,
         x12 = (x1+x2)/2,   y12 = (y1+y2)/2,                                     // Halfway points
         x31 = (x3+x1)/2,   y31 = (y3+y1)/2,
         𝘅12 = x12-x1,      𝘆12 = y12-y1,                                        // Interior vector
@@ -2319,6 +3247,9 @@ number of vertices in each layer for each item.
   int     i(float f)            {return (int)f;}                                // Integer from float
   int     i(double d)           {return (int)d;}                                // Integer from double
   float   d(float x, float y)   {return (float)Math.hypot(x, y);}               // Length of a vector
+  float   d(float x, float y,                                                   // Distance between two points
+            float 𝘅, float 𝘆)   {return (float)Math.hypot(x-𝘅, y-𝘆);}
+  float   d(PointF p, PointF q) {return d(p.x, p.y, q.x, q.y);}                 // Distance between two points
   float   f(int i)              {return (float)i;}                              // Float from integer
   float   f(long l)             {return (float)l;}                              // Float from long
   float   f(Float f, float d)   {return f != null ? f : d;}                     // Float from Box default
@@ -2339,14 +3270,17 @@ number of vertices in each layer for each item.
   boolean ff()                  {return Math.random() > 0.5;}                   // Fifty-fifty chance
   float   sd(float a)           {return f(Math.sin(Math.toRadians(a)));}        // Sin of degrees as float
   float   cd(float a)           {return f(Math.cos(Math.toRadians(a)));}        // Cos of degrees as float
+  float   td(float a)           {return f(Math.tan(Math.toRadians(a)));}        // Tan of degrees as float
   float   sr(float a)           {return f(Math.sin(a));}                        // Sin of radians as float
   float   cr(float a)           {return f(Math.cos(a));}                        // Cos of radians as float
   float   ac(double x, double h){return f(Math.toDegrees(Math.acos(x / h)));}   // acos() in degrees
   float   as(double y, double h){return f(Math.toDegrees(Math.asin(y / h)));}   // asin() in degrees
   float   at(double x, double y){return f(Math.toDegrees(Math.atan2(y, x)));}   // atan() in degrees - two argument form - anticlockwise between -𝝿 and +𝝿 .
-  float   os(double s, double h){return f(Math.sqrt(h*h-s*s));}                 // Other side of right angle triangle
+  float   os(float  s, float  h){return f(Math.sqrt(h*h-s*s));}                 // Other side of right angle triangle
+  double  os(double s, double h){return   Math.sqrt(h*h-s*s) ;}                 // Other side of right angle triangle
   float   nd(float a)  {final float  A = a % 360f; return A >= 0 ? A : 360+A;}  // Normalize degrees to [0,360)
-  double  nd(double a) {final double A = a % 360f; return A >= 0 ? A : 360+A;}  // Normalize degrees to [0,360)
+  double  nd(double a) {final double A = a % 360 ; return A >= 0 ? A : 360+A;}  // Normalize degrees to [0,360)
+  float   nt(float a)  {final float  A = nd(a);    return A <180 ? A : 360-A;}  // Normalize an angle to the interior of a triangle
   float   sq(float  x)          {return f(Math.sqrt(x));}                       // Square root
   double  sq(double x)          {return   Math.sqrt(x);}                        // Square root
   int     SQ(int    x)          {return x*x;}                                   // Square
