@@ -2778,6 +2778,7 @@ number of vertices in each layer for each item.
       𝝲1840 = new EulerGoal(1,1, 18, 40, "18-40 - 9. on circumcircle and ic tangential to Eulers line"),
       𝝲1872 = new EulerGoal(0,1, 18, 72, "18-72 - altitude on centroid and incircle in right angle triangle"),
       𝝲2039 = new EulerGoal(1,1, 20, 39, "20-39 - 9. on circumcircle and ic intersects centroid"),
+      𝝲2051 = new EulerGoal(1,1, 19.3341412462672, 51.3317175074655, "19-51 Nine point circle centre on one side and intersection of altitude, side bisector, median"),
       𝝲2238 = new EulerGoal(1,1, 22, 38, "22-38 - 9. on circumcircle and ic tangential to central bisector"),
       𝝲2273 = new EulerGoal(0,1, 22, 73, "43-55 - altitude on centroid and incircle+orthocentre on incircle"),
 /*ok*/𝝲2323 = new EulerGoal(0,0, 22.5,  22.5,  "Octagon"),                          // The altitudes cross an extension of the reference sides at right angles
@@ -2786,6 +2787,7 @@ number of vertices in each layer for each item.
       𝝲2436 = new EulerGoal(1,1, 24, 36, "24-36 - 9. on circumcircle and ir touches Eulers Line"),
       𝝲2452 = new EulerGoal(1,1, 24, 52, "24-52 - a+b+c and e+i+r"),
       𝝲2474 = new EulerGoal(0,1, 24, 74, "24-74 - a+9pr+ic and c+a+q"),
+      𝝲2546 = new EulerGoal(1,1, 25, 46, "25-47 - Two radii of incircle touch Euler's line, possible a+c+ir, possible: c+9w+iw"),
       𝝲2733 = new EulerGoal(1,1, 27, 33, "27-33 - 9. on circumcircle and ir touches central bisector"),
       𝝲2745 = new EulerGoal(0,0, 27, 45, "27-45 perhaps: a+c+qt"                                       ),
       𝝲2828 = new EulerGoal(0,0, 28, 28, "IntersectionOfNinePointCentreWithCircumCircleAtSideBisectors"),
@@ -2800,7 +2802,7 @@ number of vertices in each layer for each item.
       𝝲3345 = new EulerGoal(0,0, 33, 45, "33-45"                                                      ),
 /*ok*/𝝲3434 = new EulerGoal(0,0, 34.26, 34.26, "DiameterOfNinePointCircleIsChordOfCircumCircle"        ),  // See tests/Euler-34-34.pl
       𝝲3473 = new EulerGoal(1,1, 34, 73, "34-73 - b+b+q+ic perhaps: b+qt+ic"),
-/*ok*/𝝲3555 = new EulerGoal(0,0, 35.26, 54.74, "CentroidAltitudeBisectorInRATriangle"                  ),  // see ../tests
+/*ok*/𝝲3555 = new EulerGoal(0,0, 35.26, 54.74, "CentroidAltitudeBisectorInRATriangle"                  ),  // /home/phil/z/Geometry/tests/algebraicSolutions/EulerGoals/35-55.pl
       𝝲3561 = new EulerGoal(0,1, 35, 61, "35-61 - a+ic+qt and orthocentre on incircle, possible: b+c+ir"),
       𝝲3567 = new EulerGoal(0,1, 35, 67, "35-67 - a+ir+qt+c"                                           ),
 /*ok*/𝝲3636 = new EulerGoal(0,0, 36, 36, "Pentagon"                                                    ),  // Drag apex of reference triangle to apex of pentagon drawn inside nine point circle
@@ -2809,6 +2811,7 @@ number of vertices in each layer for each item.
       𝝲4056 = new EulerGoal(0,1, 40, 56, "40-56 Altitude on side bisector and incircle radius"         ),
       𝝲4155 = new EulerGoal(0,1, 41, 55, "41-55 - altitude on centroid and incircle"                   ),
       𝝲4260 = new EulerGoal(0,0, 42, 60, "42-60"                                                       ),
+      𝝲4468 = new EulerGoal(0,0, 44, 68, "44-68 a+9w+it isosceles possible: a+b on isosceles sides of triangle"),
 /*ok*/𝝲4545 = new EulerGoal(0,0, 45, 45, "IsocelesRightAngleTriangle"                                  ),  // Altitudes plus side bisectors make a square with Euler's line and the nine point circle radii making diagonals
       𝝲4557 = new EulerGoal(0,0, 45, 57, "a+b+c and a+b+base"                                          ),
       𝝲4559 = new EulerGoal(1,0, 45, 59, "45-59 - on intriangle"                                       ),
@@ -2826,7 +2829,7 @@ number of vertices in each layer for each item.
 
     EulerGoal currentGoal;                                                      // The current goal
     void setGoal()                                                              // Override this goal as desired
-     {currentGoal = 𝝲3555;
+     {currentGoal = 𝝲2051;
       super.setCurrentGoal(currentGoal);
      }
 
@@ -3104,7 +3107,10 @@ number of vertices in each layer for each item.
        }
       if (inCircleAway())                                                       // Radius away - opposite to the radius to the touch point on the side
        {final PointF q = drawInCircleRadius;
-        setPaint(𝝺InCircle(), 𝕕InCircleAway); opposite(p, c, q); drawLine(c, q);
+        setPaint(𝝺InCircle(), 𝕕InCircleAway); opposite(p, c, q);
+        q.x += c.x - p.x; // Temp to extend away radii
+        q.y += c.y - p.y;
+        drawLine(c, q);
        }
      }
     boolean icc(final PointF 𝗰, final float x, final float y,                   // Find centre of in-circle and place it in point 𝗰 and return true if teh centre has been found else return false
